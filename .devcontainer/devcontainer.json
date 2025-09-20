@@ -1,0 +1,81 @@
+{
+  "name": "Evidence Wall Development",
+  "image": "mcr.microsoft.com/devcontainers/go:1.21",
+  "workspaceFolder": "/workspaces/evidence-wall",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.21"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "18"
+    },
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/devcontainers/features/git:1": {}
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-vscode.vscode-typescript-next",
+        "bradlc.vscode-tailwindcss",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml",
+        "ms-azuretools.vscode-docker",
+        "esbenp.prettier-vscode",
+        "ms-vscode.test-adapter-converter",
+        "hbenl.vscode-test-explorer",
+        "formulahendry.auto-rename-tag",
+        "christian-kohler.path-intellisense",
+        "ms-vscode.vscode-eslint"
+      ],
+      "settings": {
+        "go.toolsManagement.checkForUpdates": "local",
+        "go.useLanguageServer": true,
+        "go.gopath": "/go",
+        "go.goroot": "/usr/local/go",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": true
+        },
+        "typescript.preferences.importModuleSpecifier": "relative",
+        "eslint.workingDirectories": ["frontend"]
+      }
+    }
+  },
+
+  "forwardPorts": [3000, 8001, 8002, 8003, 5432, 6379],
+  "portsAttributes": {
+    "3000": {
+      "label": "Frontend",
+      "onAutoForward": "notify"
+    },
+    "8001": {
+      "label": "Auth Service",
+      "onAutoForward": "silent"
+    },
+    "8002": {
+      "label": "Boards Service", 
+      "onAutoForward": "silent"
+    },
+    "8003": {
+      "label": "Realtime Service",
+      "onAutoForward": "silent"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "silent"
+    },
+    "6379": {
+      "label": "Redis",
+      "onAutoForward": "silent"
+    }
+  },
+
+  "postCreateCommand": "make setup",
+  "postStartCommand": "echo 'Development environment ready! Run: make dev'",
+
+  "remoteUser": "vscode"
+}
+

@@ -1,0 +1,162 @@
+networks:
+  # Internal network for database and cache services
+  internal:
+    driver: bridge
+    internal: true
+  # Backend network for API services
+  backend:
+    driver: bridge
+  # Frontend network for public-facing services
+  frontend:
+    driver: bridge
+
+services:
+  # Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: evidencewall
+      POSTGRES_PASSWORD: evidencewall_password
+      POSTGRES_DB: evidencewall
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    networks:
+      - internal
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evidencewall"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for caching and pub/sub
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Authentication Service
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth/Dockerfile
+    networks:
+      - backend
+    environment:
+      - DATABASE_URL=postgres://evidencewall:evidencewall_password@postgres:5432/evidencewall?sslmode=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - JWT_EXPIRY=24h
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URL=http://localhost/api/auth/google/callback
+      - CORS_ORIGINS=http://localhost,https://localhost
+      - ENVIRONMENT=production
+      - LOG_LEVEL=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Boards Service
+  boards-service:
+    build:
+      context: .
+      dockerfile: services/boards/Dockerfile
+    networks:
+      - backend
+    environment:
+      - DATABASE_URL=postgres://evidencewall:evidencewall_password@postgres:5432/evidencewall?sslmode=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - CORS_ORIGINS=http://localhost,https://localhost
+      - ENVIRONMENT=production
+      - LOG_LEVEL=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    restart: unless-stopped
+
+  # Real-time Service
+  realtime-service:
+    build:
+      context: .
+      dockerfile: services/realtime/Dockerfile
+    networks:
+      - backend
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - BOARDS_SERVICE_URL=http://boards-service:8002
+      - CORS_ORIGINS=http://localhost,https://localhost
+      - ENVIRONMENT=production
+      - LOG_LEVEL=info
+    depends_on:
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      boards-service:
+        condition: service_started
+    restart: unless-stopped
+
+  # Reverse Proxy (NGINX)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    networks:
+      - frontend
+      - backend
+    depends_on:
+      - frontend
+      - auth-service
+      - boards-service
+      - realtime-service
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    networks:
+      - frontend
+    environment:
+      - REACT_APP_API_BASE_URL=/api/auth
+      - REACT_APP_BOARDS_API_URL=/api/boards
+      - REACT_APP_WEBSOCKET_URL=/api/realtime
+      - REACT_APP_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+    depends_on:
+      - auth-service
+      - boards-service
+      - realtime-service
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

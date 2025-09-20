@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detective's Evidence Board</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            background: #2c2c2c;
+        }
+
+        .board-container {
+            width: 300vw;
+            height: 300vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(139, 119, 101, 0.8), transparent 2px),
+                radial-gradient(circle at 70% 20%, rgba(160, 142, 124, 0.6), transparent 2px),
+                radial-gradient(circle at 40% 70%, rgba(120, 100, 85, 0.7), transparent 2px),
+                radial-gradient(circle at 90% 80%, rgba(145, 125, 108, 0.5), transparent 2px),
+                linear-gradient(45deg, #c4a484 0%, #d4b896 25%, #c8a688 50%, #ddc2a4 75%, #c4a484 100%);
+            background-size: 50px 50px, 75px 75px, 60px 60px, 40px 40px, 100% 100%;
+            cursor: crosshair;
+            transform-origin: 0 0;
+        }
+
+        .viewport {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .board-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px),
+                repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+            pointer-events: none;
+        }
+
+        .controls {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 8px;
+            border-radius: 6px;
+            color: white;
+            font-size: 12px;
+            max-width: 280px;
+        }
+
+        .controls h3 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+            margin-bottom: 6px;
+        }
+
+        .controls button {
+            padding: 6px 10px;
+            border: none;
+            border-radius: 3px;
+            background: #4a5568;
+            color: white;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 11px;
+            flex: 1;
+            min-width: 60px;
+        }
+
+        .controls button:hover {
+            background: #2d3748;
+        }
+
+        .color-picker {
+            margin-top: 6px;
+        }
+
+        .color-picker > div {
+            margin-bottom: 4px;
+            font-size: 10px;
+        }
+
+        .color-picker button {
+            width: 20px;
+            height: 20px;
+            margin: 1px;
+            border: 1px solid #333;
+            cursor: pointer;
+            border-radius: 2px;
+            min-width: auto;
+            padding: 0;
+        }
+
+        .status-info {
+            margin-top: 6px;
+            font-size: 10px;
+            line-height: 1.2;
+        }
+
+        .status-info div {
+            margin: 1px 0;
+        }
+
+        #saveStatus {
+            color: #90EE90;
+        }
+
+        .post-it {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            background: #ffeb3b;
+            color: #333;
+            padding: 20px 15px 15px 15px;
+            box-shadow: 
+                0 4px 8px rgba(0,0,0,0.2),
+                inset 0 0 0 1px rgba(0,0,0,0.1);
+            cursor: move;
+            transform-origin: center;
+            transition: transform 0.1s ease;
+            font-size: 14px;
+            line-height: 1.4;
+            border-radius: 2px;
+        }
+
+        .post-it:hover {
+            transform: scale(1.02) rotate(-0.5deg);
+            z-index: 100;
+        }
+
+        .post-it.dragging {
+            z-index: 200;
+            transform: scale(1.05) rotate(2deg);
+        }
+
+        .post-it::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            height: 25px;
+            background: rgba(255, 235, 59, 0.8);
+            border-radius: 2px 2px 0 0;
+        }
+
+        .post-it textarea {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: transparent;
+            resize: none;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #333;
+            outline: none;
+        }
+
+        .suspect-card {
+            position: absolute;
+            width: 250px;
+            height: 300px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            box-shadow: 
+                0 6px 12px rgba(0,0,0,0.3),
+                inset 0 0 0 1px rgba(0,0,0,0.1);
+            cursor: move;
+            transition: transform 0.1s ease;
+            border-radius: 4px;
+        }
+
+        .suspect-card:hover {
+            transform: scale(1.02);
+            z-index: 100;
+        }
+
+        .suspect-card.dragging {
+            z-index: 200;
+            transform: scale(1.05);
+        }
+
+        .suspect-card .photo {
+            width: 100%;
+            height: 180px;
+            background: #e0e0e0;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            color: #999;
+        }
+
+        .suspect-card .info {
+            padding: 15px;
+        }
+
+        .suspect-card .name {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .suspect-card .details {
+            font-size: 12px;
+            color: #666;
+            line-height: 1.3;
+        }
+
+        .pin {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: radial-gradient(circle at 30% 30%, #ff4444, #cc0000);
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            box-shadow: 
+                0 2px 4px rgba(0,0,0,0.3),
+                inset 1px 1px 2px rgba(255,255,255,0.3);
+            top: -8px;
+            left: 50%;
+            margin-left: -8px;
+            z-index: 10;
+        }
+
+        .pin::before {
+            content: '';
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: radial-gradient(circle at 30% 30%, #ffaaaa, #ff6666);
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transform: rotate(45deg);
+        }
+
+        .string-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .string-line {
+            stroke: #cc0000;
+            stroke-width: 2;
+            fill: none;
+            filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.3));
+        }
+
+        .connection-mode {
+            cursor: crosshair !important;
+        }
+
+        .connection-mode .post-it,
+        .connection-mode .suspect-card {
+            cursor: crosshair !important;
+        }
+
+        .delete-mode {
+            cursor: crosshair !important;
+        }
+
+        .delete-mode .post-it,
+        .delete-mode .suspect-card {
+            cursor: crosshair !important;
+        }
+
+        .connectable:hover {
+            outline: 2px dashed #cc0000;
+        }
+
+        .deleteable:hover {
+            outline: 2px dashed #ff4444;
+            filter: brightness(0.8);
+        }
+
+        .color-picker {
+            margin-top: 10px;
+        }
+
+        .color-picker button {
+            width: 30px;
+            height: 30px;
+            margin: 2px;
+            border: 2px solid #333;
+            cursor: pointer;
+        }
+
+        .post-it.pink { background: #ffcdd2; }
+        .post-it.blue { background: #bbdefb; }
+        .post-it.green { background: #c8e6c9; }
+        .post-it.orange { background: #ffe0b2; }
+        .post-it.purple { background: #e1bee7; }
+    </style>
+</head>
+<body>
+    <div class="viewport">
+        <div class="board-container" id="board">
+            <svg class="string-svg" id="stringsSvg">
+            </svg>
+        </div>
+    </div>
+
+    <div class="controls">
+        <h3>Detective's Evidence Board</h3>
+        <button onclick="addPostIt()">Add Post-It Note</button>
+        <button onclick="addSuspectCard()">Add Suspect Card</button>
+        <button onclick="toggleConnectionMode()" id="connectionBtn">Connect Items</button>
+        <button onclick="toggleDeleteMode()" id="deleteBtn">Delete Items</button>
+        <button onclick="clearConnections()">Clear Strings</button>
+        <button onclick="resetView()">Reset View</button>
+        <button onclick="saveBoard()">Save Board</button>
+        <button onclick="loadBoard()">Load Board</button>
+        <button onclick="clearBoard()">Clear All</button>
+        <div style="margin-top: 10px; font-size: 12px;">
+            Zoom: <span id="zoomLevel">100%</span><br>
+            Ctrl + mouse wheel to zoom<br>
+            Drag to pan<br>
+            <span id="saveStatus" style="color: #90EE90;"></span>
+        </div>
+        
+        <div class="color-picker">
+            <div>Post-It Colors:</div>
+            <button style="background: #ffeb3b" onclick="setPostItColor('#ffeb3b')"></button>
+            <button style="background: #ffcdd2" onclick="setPostItColor('#ffcdd2')"></button>
+            <button style="background: #bbdefb" onclick="setPostItColor('#bbdefb')"></button>
+            <button style="background: #c8e6c9" onclick="setPostItColor('#c8e6c9')"></button>
+            <button style="background: #ffe0b2" onclick="setPostItColor('#ffe0b2')"></button>
+            <button style="background: #e1bee7" onclick="setPostItColor('#e1bee7')"></button>
+        </div>
+    </div>
+
+    <script>
+        let connectionMode = false;
+        let deleteMode = false;
+        let firstConnection = null;
+        let connections = [];
+        let currentPostItColor = '#ffeb3b';
+        let itemCounter = 0;
+        let isPanning = false;
+        let startPanX = 0;
+        let startPanY = 0;
+        let currentPanX = 0;
+        let currentPanY = 0;
+        let currentZoom = 1;
+        let minZoom = 0.25;
+        let maxZoom = 3;
+
+        // Initialize board position
+        const board = document.getElementById('board');
+        updateBoardTransform();
+
+        function updateBoardTransform() {
+            board.style.transform = `translate(${currentPanX}px, ${currentPanY}px) scale(${currentZoom})`;
+        }
+
+        // Add panning functionality
+        document.addEventListener('mousedown', (e) => {
+            if (connectionMode || deleteMode || e.target.closest('.post-it') || e.target.closest('.suspect-card') || e.target.closest('.controls')) {
+                return;
+            }
+            
+            isPanning = true;
+            startPanX = e.clientX - currentPanX;
+            startPanY = e.clientY - currentPanY;
+            document.body.style.cursor = 'grabbing';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isPanning) return;
+            
+            currentPanX = e.clientX - startPanX;
+            currentPanY = e.clientY - startPanY;
+            
+            // Limit panning to keep some board visible
+            const boardWidth = board.offsetWidth * currentZoom;
+            const boardHeight = board.offsetHeight * currentZoom;
+            const maxPanX = window.innerWidth * 0.5;
+            const maxPanY = window.innerHeight * 0.5;
+            const minPanX = -(boardWidth - window.innerWidth * 0.5);
+            const minPanY = -(boardHeight - window.innerHeight * 0.5);
+            
+            currentPanX = Math.max(minPanX, Math.min(maxPanX, currentPanX));
+            currentPanY = Math.max(minPanY, Math.min(maxPanY, currentPanY));
+            
+            updateBoardTransform();
+            updateConnections();
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isPanning) {
+                isPanning = false;
+                document.body.style.cursor = '';
+            }
+        });
+
+        // Add zoom functionality with mouse wheel (Ctrl + wheel)
+        document.addEventListener('wheel', (e) => {
+            if (e.target.closest('.controls')) return;
+            
+            // Only zoom when Ctrl key is held
+            if (!e.ctrlKey) return;
+            
+            e.preventDefault();
+            
+            const zoomFactor = 0.1;
+            const rect = board.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            const oldZoom = currentZoom;
+            
+            if (e.deltaY < 0) {
+                // Zoom in
+                currentZoom = Math.min(maxZoom, currentZoom + zoomFactor);
+            } else {
+                // Zoom out
+                currentZoom = Math.max(minZoom, currentZoom - zoomFactor);
+            }
+            
+            // Zoom towards mouse position
+            if (currentZoom !== oldZoom) {
+                const zoomRatio = currentZoom / oldZoom;
+                currentPanX = mouseX - (mouseX - currentPanX) * zoomRatio;
+                currentPanY = mouseY - (mouseY - currentPanY) * zoomRatio;
+                
+                updateBoardTransform();
+                updateZoomDisplay();
+                updateConnections();
+            }
+        });
+
+        function addPostIt() {
+            const postIt = document.createElement('div');
+            postIt.className = 'post-it connectable';
+            postIt.style.left = Math.random() * (board.offsetWidth - 200) + 'px';
+            postIt.style.top = Math.random() * (board.offsetHeight - 200) + 'px';
+            postIt.style.background = currentPostItColor;
+            postIt.style.transform = `rotate(${(Math.random() - 0.5) * 10}deg)`;
+            postIt.dataset.id = 'item-' + (++itemCounter);
+
+            const pin = document.createElement('div');
+            pin.className = 'pin';
+            postIt.appendChild(pin);
+
+            const textarea = document.createElement('textarea');
+            textarea.placeholder = 'Evidence notes...';
+            postIt.appendChild(textarea);
+
+            makeDraggable(postIt);
+            makeConnectable(postIt);
+            makeDeletable(postIt);
+            board.appendChild(postIt);
+        }
+
+        function addSuspectCard() {
+            const card = document.createElement('div');
+            card.className = 'suspect-card connectable';
+            card.style.left = Math.random() * (board.offsetWidth - 250) + 'px';
+            card.style.top = Math.random() * (board.offsetHeight - 300) + 'px';
+            card.style.transform = `rotate(${(Math.random() - 0.5) * 6}deg)`;
+            card.dataset.id = 'item-' + (++itemCounter);
+
+            const pin = document.createElement('div');
+            pin.className = 'pin';
+            card.appendChild(pin);
+
+            const photo = document.createElement('div');
+            photo.className = 'photo';
+            photo.innerHTML = '👤';
+            card.appendChild(photo);
+
+            const info = document.createElement('div');
+            info.className = 'info';
+            info.innerHTML = `
+                <div class="name" contenteditable="true">Suspect Name</div>
+                <div class="details" contenteditable="true">Age: Unknown<br>Last seen: <br>Notes: </div>
+            `;
+            card.appendChild(info);
+
+            makeDraggable(card);
+            makeConnectable(card);
+            makeDeletable(card);
+            board.appendChild(card);
+        }
+
+        function makeDraggable(element) {
+            let isDragging = false;
+            let startX, startY, startLeft, startTop;
+
+            element.addEventListener('mousedown', (e) => {
+                if (connectionMode || deleteMode) return;
+                if (e.target.tagName === 'TEXTAREA' || e.target.contentEditable === 'true') return;
+                
+                isDragging = true;
+                element.classList.add('dragging');
+                
+                startX = e.clientX;
+                startY = e.clientY;
+                startLeft = parseInt(element.style.left) || 0;
+                startTop = parseInt(element.style.top) || 0;
+
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+
+                element.style.left = (startLeft + deltaX) + 'px';
+                element.style.top = (startTop + deltaY) + 'px';
+
+                updateConnections();
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    element.classList.remove('dragging');
+                }
+            });
+        }
+
+        function makeConnectable(element) {
+            element.addEventListener('click', (e) => {
+                if (!connectionMode || deleteMode) return;
+                e.stopPropagation();
+
+                if (!firstConnection) {
+                    firstConnection = element;
+                    element.style.outline = '3px solid #cc0000';
+                } else if (firstConnection !== element) {
+                    createConnection(firstConnection, element);
+                    firstConnection.style.outline = '';
+                    firstConnection = null;
+                }
+            });
+        }
+
+        function makeDeletable(element) {
+            element.addEventListener('click', (e) => {
+                if (!deleteMode) return;
+                e.stopPropagation();
+                
+                // Remove all connections involving this element
+                connections = connections.filter(conn => 
+                    conn.element1 !== element && conn.element2 !== element
+                );
+                
+                // Remove the element from the board
+                element.remove();
+                
+                // Update connections display
+                updateConnections();
+            });
+        }
+
+        function createConnection(item1, item2) {
+            const connection = {
+                id1: item1.dataset.id,
+                id2: item2.dataset.id,
+                element1: item1,
+                element2: item2
+            };
+            connections.push(connection);
+            updateConnections();
+        }
+
+        function updateConnections() {
+            const svg = document.getElementById('stringsSvg');
+            svg.innerHTML = '';
+
+            connections.forEach(conn => {
+                // Get item positions directly from their style properties
+                const item1 = conn.element1;
+                const item2 = conn.element2;
+                
+                const x1 = parseInt(item1.style.left) + (item1.offsetWidth / 2);
+                const y1 = parseInt(item1.style.top);
+                const x2 = parseInt(item2.style.left) + (item2.offsetWidth / 2);
+                const y2 = parseInt(item2.style.top);
+
+                // Calculate sag for realistic string physics
+                const distance = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+                const sagAmount = Math.min(distance * 0.1, 30); // Sag proportional to distance, max 30px
+                
+                const midX = (x1 + x2) / 2;
+                const midY = (y1 + y2) / 2 + sagAmount;
+
+                // Create curved path using quadratic bezier
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                const pathData = `M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`;
+                path.setAttribute('d', pathData);
+                path.setAttribute('class', 'string-line');
+
+                svg.appendChild(path);
+            });
+        }
+
+        function toggleConnectionMode() {
+            connectionMode = !connectionMode;
+            if (connectionMode) {
+                deleteMode = false; // Disable delete mode
+                updateDeleteMode();
+            }
+            updateConnectionMode();
+        }
+
+        function toggleDeleteMode() {
+            deleteMode = !deleteMode;
+            if (deleteMode) {
+                connectionMode = false; // Disable connection mode
+                updateConnectionMode();
+            }
+            updateDeleteMode();
+        }
+
+        function updateConnectionMode() {
+            const board = document.getElementById('board');
+            const btn = document.getElementById('connectionBtn');
+
+            if (connectionMode) {
+                board.classList.add('connection-mode');
+                board.classList.remove('delete-mode');
+                btn.textContent = 'Exit Connect';
+                btn.style.background = '#cc0000';
+                
+                // Add connectable class to items
+                document.querySelectorAll('.post-it, .suspect-card').forEach(item => {
+                    item.classList.add('connectable');
+                    item.classList.remove('deleteable');
+                });
+            } else {
+                board.classList.remove('connection-mode');
+                btn.textContent = 'Connect';
+                btn.style.background = '#4a5568';
+                if (firstConnection) {
+                    firstConnection.style.outline = '';
+                    firstConnection = null;
+                }
+                
+                // Remove connectable class
+                document.querySelectorAll('.post-it, .suspect-card').forEach(item => {
+                    item.classList.remove('connectable');
+                });
+            }
+        }
+
+        function updateDeleteMode() {
+            const board = document.getElementById('board');
+            const btn = document.getElementById('deleteBtn');
+
+            if (deleteMode) {
+                board.classList.add('delete-mode');
+                board.classList.remove('connection-mode');
+                btn.textContent = 'Exit Delete';
+                btn.style.background = '#ff4444';
+                
+                // Add deleteable class to items
+                document.querySelectorAll('.post-it, .suspect-card').forEach(item => {
+                    item.classList.add('deleteable');
+                    item.classList.remove('connectable');
+                });
+            } else {
+                board.classList.remove('delete-mode');
+                btn.textContent = 'Delete';
+                btn.style.background = '#4a5568';
+                
+                // Remove deleteable class
+                document.querySelectorAll('.post-it, .suspect-card').forEach(item => {
+                    item.classList.remove('deleteable');
+                });
+            }
+        }
+
+        function clearConnections() {
+            connections = [];
+            updateConnections();
+        }
+
+        function resetView() {
+            currentPanX = 0;
+            currentPanY = 0;
+            currentZoom = 1;
+            updateBoardTransform();
+            updateZoomDisplay();
+            updateConnections();
+        }
+
+        function updateZoomDisplay() {
+            document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+        }
+
+        function showSaveStatus(message, isError = false) {
+            const statusEl = document.getElementById('saveStatus');
+            statusEl.textContent = message;
+            statusEl.style.color = isError ? '#ff6b6b' : '#90EE90';
+            setTimeout(() => {
+                statusEl.textContent = '';
+            }, 3000);
+        }
+
+        function saveBoard() {
+            try {
+                const boardState = {
+                    items: [],
+                    connections: [],
+                    view: {
+                        panX: currentPanX,
+                        panY: currentPanY,
+                        zoom: currentZoom
+                    },
+                    savedAt: new Date().toISOString()
+                };
+
+                // Save all items (post-its and suspect cards)
+                document.querySelectorAll('.post-it, .suspect-card').forEach(item => {
+                    const itemData = {
+                        id: item.dataset.id,
+                        type: item.classList.contains('post-it') ? 'post-it' : 'suspect-card',
+                        x: parseInt(item.style.left),
+                        y: parseInt(item.style.top),
+                        rotation: item.style.transform.match(/rotate\(([^)]+)\)/)?.[1] || '0deg',
+                        backgroundColor: item.style.backgroundColor || currentPostItColor
+                    };
+
+                    if (item.classList.contains('post-it')) {
+                        itemData.content = item.querySelector('textarea').value;
+                    } else {
+                        itemData.name = item.querySelector('.name').textContent;
+                        itemData.details = item.querySelector('.details').textContent;
+                    }
+
+                    boardState.items.push(itemData);
+                });
+
+                // Save connections
+                boardState.connections = connections.map(conn => ({
+                    id1: conn.id1,
+                    id2: conn.id2
+                }));
+
+                // Store in memory (simulating localStorage)
+                window.savedBoardState = boardState;
+                showSaveStatus('Board saved successfully!');
+            } catch (error) {
+                showSaveStatus('Error saving board', true);
+                console.error('Save error:', error);
+            }
+        }
+
+        function loadBoard() {
+            try {
+                const boardState = window.savedBoardState;
+                if (!boardState) {
+                    showSaveStatus('No saved board found', true);
+                    return;
+                }
+
+                // Clear current board
+                clearBoard();
+
+                // Restore view
+                currentPanX = boardState.view.panX;
+                currentPanY = boardState.view.panY;
+                currentZoom = boardState.view.zoom;
+                updateBoardTransform();
+                updateZoomDisplay();
+
+                // Restore items
+                boardState.items.forEach(itemData => {
+                    let element;
+                    
+                    if (itemData.type === 'post-it') {
+                        element = document.createElement('div');
+                        element.className = 'post-it connectable';
+                        element.style.backgroundColor = itemData.backgroundColor;
+                        
+                        const pin = document.createElement('div');
+                        pin.className = 'pin';
+                        element.appendChild(pin);
+                        
+                        const textarea = document.createElement('textarea');
+                        textarea.placeholder = 'Evidence notes...';
+                        textarea.value = itemData.content || '';
+                        element.appendChild(textarea);
+                    } else {
+                        element = document.createElement('div');
+                        element.className = 'suspect-card connectable';
+                        
+                        const pin = document.createElement('div');
+                        pin.className = 'pin';
+                        element.appendChild(pin);
+                        
+                        const photo = document.createElement('div');
+                        photo.className = 'photo';
+                        photo.innerHTML = '👤';
+                        element.appendChild(photo);
+                        
+                        const info = document.createElement('div');
+                        info.className = 'info';
+                        info.innerHTML = `
+                            <div class="name" contenteditable="true">${itemData.name || 'Suspect Name'}</div>
+                            <div class="details" contenteditable="true">${itemData.details || 'Age: Unknown\\nLast seen: \\nNotes: '}</div>
+                        `;
+                        element.appendChild(info);
+                    }
+
+                    element.dataset.id = itemData.id;
+                    element.style.left = itemData.x + 'px';
+                    element.style.top = itemData.y + 'px';
+                    element.style.transform = `rotate(${itemData.rotation})`;
+
+                    makeDraggable(element);
+                    makeConnectable(element);
+                    makeDeletable(element);
+                    board.appendChild(element);
+                });
+
+                // Update item counter to avoid ID conflicts
+                const maxId = Math.max(0, ...boardState.items.map(item => 
+                    parseInt(item.id.split('-')[1]) || 0
+                ));
+                itemCounter = maxId;
+
+                // Restore connections
+                setTimeout(() => {
+                    boardState.connections.forEach(connData => {
+                        const element1 = document.querySelector(`[data-id="${connData.id1}"]`);
+                        const element2 = document.querySelector(`[data-id="${connData.id2}"]`);
+                        
+                        if (element1 && element2) {
+                            const connection = {
+                                id1: connData.id1,
+                                id2: connData.id2,
+                                element1: element1,
+                                element2: element2
+                            };
+                            connections.push(connection);
+                        }
+                    });
+                    updateConnections();
+                }, 100);
+
+                const savedDate = new Date(boardState.savedAt).toLocaleString();
+                showSaveStatus(`Board loaded (saved ${savedDate})`);
+            } catch (error) {
+                showSaveStatus('Error loading board', true);
+                console.error('Load error:', error);
+            }
+        }
+
+        function clearBoard() {
+            // Remove all items
+            document.querySelectorAll('.post-it, .suspect-card').forEach(item => {
+                item.remove();
+            });
+            
+            // Clear connections
+            connections = [];
+            updateConnections();
+            
+            showSaveStatus('Board cleared');
+        }
+
+        function shareBoard() {
+            try {
+                const boardState = {
+                    items: [],
+                    connections: [],
+                    view: {
+                        panX: currentPanX,
+                        panY: currentPanY,
+                        zoom: currentZoom
+                    },
+                    createdAt: new Date().toISOString(),
+                    boardId: 'board_' + Math.random().toString(36).substr(2, 9)
+                };
+
+                // Save all items (same as saveBoard function)
+                document.querySelectorAll('.post-it, .suspect-card').forEach(item => {
+                    const itemData = {
+                        id: item.dataset.id,
+                        type: item.classList.contains('post-it') ? 'post-it' : 'suspect-card',
+                        x: parseInt(item.style.left),
+                        y: parseInt(item.style.top),
+                        rotation: item.style.transform.match(/rotate\(([^)]+)\)/)?.[1] || '0deg',
+                        backgroundColor: item.style.backgroundColor || currentPostItColor
+                    };
+
+                    if (item.classList.contains('post-it')) {
+                        itemData.content = item.querySelector('textarea').value;
+                    } else {
+                        itemData.name = item.querySelector('.name').textContent;
+                        itemData.details = item.querySelector('.details').textContent;
+                    }
+
+                    boardState.items.push(itemData);
+                });
+
+                // Save connections
+                boardState.connections = connections.map(conn => ({
+                    id1: conn.id1,
+                    id2: conn.id2
+                }));
+
+                // Generate shareable data
+                const shareData = btoa(JSON.stringify(boardState));
+                
+                // In a real implementation, this would POST to: /api/boards
+                // const response = await fetch('/api/boards', {
+                //     method: 'POST',
+                //     headers: { 'Content-Type': 'application/json' },
+                //     body: JSON.stringify(boardState)
+                // });
+                // const { boardId } = await response.json();
+                // const shareUrl = `${window.location.origin}?board=${boardId}`;
+
+                // For demo purposes, show the shareable data
+                const textarea = document.createElement('textarea');
+                textarea.value = shareData;
+                textarea.style.position = 'fixed';
+                textarea.style.top = '50%';
+                textarea.style.left = '50%';
+                textarea.style.transform = 'translate(-50%, -50%)';
+                textarea.style.width = '600px';
+                textarea.style.height = '300px';
+                textarea.style.background = '#fff';
+                textarea.style.color = '#000';
+                textarea.style.border = '2px solid #333';
+                textarea.style.borderRadius = '8px';
+                textarea.style.padding = '10px';
+                textarea.style.zIndex = '2000';
+                textarea.style.fontSize = '12px';
+                textarea.readOnly = true;
+                document.body.appendChild(textarea);
+                textarea.select();
+
+                const overlay = document.createElement('div');
+                overlay.style.position = 'fixed';
+                overlay.style.top = '0';
+                overlay.style.left = '0';
+                overlay.style.width = '100%';
+                overlay.style.height = '100%';
+                overlay.style.background = 'rgba(0,0,0,0.7)';
+                overlay.style.zIndex = '1999';
+                overlay.style.display = 'flex';
+                overlay.style.flexDirection = 'column';
+                overlay.style.alignItems = 'center';
+                overlay.style.justifyContent = 'center';
+                overlay.style.color = 'white';
+                overlay.style.fontSize = '16px';
+                overlay.style.textAlign = 'center';
+                overlay.style.cursor = 'pointer';
+
+                const instructions = document.createElement('div');
+                instructions.innerHTML = `
+                    <h3 style="margin-bottom: 20px;">Share Your Detective Board</h3>
+                    <p style="margin-bottom: 15px;">Copy this data to share your board:</p>
+                    <p style="font-size: 12px; margin-bottom: 20px; opacity: 0.8;">
+                        Board ID: ${boardState.boardId}<br>
+                        In a real app, this would be: <strong>yoursite.com?board=${boardState.boardId}</strong>
+                    </p>
+                    <p style="font-size: 14px; margin-top: 20px;">Click anywhere to close</p>
+                `;
+                
+                overlay.appendChild(instructions);
+                document.body.appendChild(overlay);
+
+                overlay.addEventListener('click', () => {
+                    document.body.removeChild(textarea);
+                    document.body.removeChild(overlay);
+                });
+
+                showSaveStatus(`Board shared! ID: ${boardState.boardId}`);
+            } catch (error) {
+                showSaveStatus('Error sharing board', true);
+                console.error('Share error:', error);
+            }
+        }
+
+        function importBoard() {
+            const shareData = prompt('Paste the shared board data here:');
+            if (!shareData) return;
+
+            try {
+                const boardState = JSON.parse(atob(shareData));
+                
+                // Clear current board
+                clearBoard();
+
+                // Restore view
+                currentPanX = boardState.view.panX || 0;
+                currentPanY = boardState.view.panY || 0;
+                currentZoom = boardState.view.zoom || 1;
+                updateBoardTransform();
+                updateZoomDisplay();
+
+                // Restore items (same as loadBoard function)
+                boardState.items.forEach(itemData => {
+                    let element;
+                    
+                    if (itemData.type === 'post-it') {
+                        element = document.createElement('div');
+                        element.className = 'post-it connectable';
+                        element.style.backgroundColor = itemData.backgroundColor;
+                        
+                        const pin = document.createElement('div');
+                        pin.className = 'pin';
+                        element.appendChild(pin);
+                        
+                        const textarea = document.createElement('textarea');
+                        textarea.placeholder = 'Evidence notes...';
+                        textarea.value = itemData.content || '';
+                        element.appendChild(textarea);
+                    } else {
+                        element = document.createElement('div');
+                        element.className = 'suspect-card connectable';
+                        
+                        const pin = document.createElement('div');
+                        pin.className = 'pin';
+                        element.appendChild(pin);
+                        
+                        const photo = document.createElement('div');
+                        photo.className = 'photo';
+                        photo.innerHTML = '👤';
+                        element.appendChild(photo);
+                        
+                        const info = document.createElement('div');
+                        info.className = 'info';
+                        info.innerHTML = `
+                            <div class="name" contenteditable="true">${itemData.name || 'Suspect Name'}</div>
+                            <div class="details" contenteditable="true">${itemData.details || 'Age: Unknown\\nLast seen: \\nNotes: '}</div>
+                        `;
+                        element.appendChild(info);
+                    }
+
+                    element.dataset.id = itemData.id;
+                    element.style.left = itemData.x + 'px';
+                    element.style.top = itemData.y + 'px';
+                    element.style.transform = `rotate(${itemData.rotation})`;
+
+                    makeDraggable(element);
+                    makeConnectable(element);
+                    makeDeletable(element);
+                    board.appendChild(element);
+                });
+
+                // Update item counter
+                const maxId = Math.max(0, ...boardState.items.map(item => 
+                    parseInt(item.id.split('-')[1]) || 0
+                ));
+                itemCounter = maxId;
+
+                // Restore connections
+                setTimeout(() => {
+                    boardState.connections.forEach(connData => {
+                        const element1 = document.querySelector(`[data-id="${connData.id1}"]`);
+                        const element2 = document.querySelector(`[data-id="${connData.id2}"]`);
+                        
+                        if (element1 && element2) {
+                            const connection = {
+                                id1: connData.id1,
+                                id2: connData.id2,
+                                element1: element1,
+                                element2: element2
+                            };
+                            connections.push(connection);
+                        }
+                    });
+                    updateConnections();
+                }, 100);
+
+                const boardId = boardState.boardId || 'Unknown';
+                showSaveStatus(`Board imported! ID: ${boardId}`);
+            } catch (error) {
+                showSaveStatus('Invalid share data', true);
+                console.error('Import error:', error);
+            }
+        }
+
+        // Auto-save every 30 seconds
+        setInterval(() => {
+            if (document.querySelectorAll('.post-it, .suspect-card').length > 0) {
+                saveBoard();
+            }
+        }, 30000);
+
+        function setPostItColor(color) {
+            currentPostItColor = color;
+        }
+
+        // Click outside to deselect connection
+        document.addEventListener('click', (e) => {
+            if (connectionMode && firstConnection && !e.target.closest('.connectable')) {
+                firstConnection.style.outline = '';
+                firstConnection = null;
+            }
+        });
+
+        // Initial setup
+        addPostIt();
+        addSuspectCard();
+        addPostIt();
+        updateZoomDisplay();
+
+        // Try to load saved board on startup
+        setTimeout(() => {
+            if (window.savedBoardState) {
+                loadBoard();
+            }
+        }, 500);
+
+        // Update connections on window resize
+        window.addEventListener('resize', updateConnections);
+    </script>
+</body>
+</html>
