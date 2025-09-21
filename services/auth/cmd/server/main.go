@@ -50,6 +50,8 @@ func main() {
 	// Load configuration
 	cfg := config.Load()
 
+	log.Printf("auth:starting ENVIRONMENT=%s DB_HOST=%s", cfg.Environment, maskDatabaseHost(cfg.DatabaseURL))
+
 	// Set Gin mode
 	if cfg.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -58,7 +60,7 @@ func main() {
 	// Connect to database
 	db, err := database.Connect(cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("auth:db connect error: %v", err)
 	}
 
 	// Run migrations
@@ -90,8 +92,25 @@ func main() {
 	// Setup router
 	router := gin.Default()
 
+	// Configure trusted proxies (empty string means trust none)
+	if cfg.TrustedProxies == "" {
+		if err := router.SetTrustedProxies(nil); err != nil {
+			log.Printf("Failed to set trusted proxies: %v", err)
+		}
+	} else {
+		// Comma-separated list
+		proxies := []string{}
+		for _, p := range splitAndTrim(cfg.TrustedProxies) {
+			proxies = append(proxies, p)
+		}
+		if err := router.SetTrustedProxies(proxies); err != nil {
+			log.Printf("Failed to set trusted proxies: %v", err)
+		}
+	}
+
 	// Add middleware
 	router.Use(middleware.CORSMiddleware(cfg.CORSOrigins))
+	router.Use(middleware.RequestLogger("auth", cfg.Environment))
 
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
@@ -131,10 +150,70 @@ func main() {
 		port = "8001"
 	}
 
-	log.Printf("Auth service starting on port %s", port)
+	log.Printf("auth:listening port=%s", port)
 	if err := router.Run(":" + port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		log.Fatalf("auth:server start error: %v", err)
 	}
 }
 
+// splitAndTrim splits a comma-separated string and trims whitespace entries, skipping empties.
+func splitAndTrim(s string) []string {
+	res := []string{}
+	start := 0
+	for i := 0; i <= len(s); i++ {
+		if i == len(s) || s[i] == ',' {
+			part := s[start:i]
+			// trim spaces
+			for len(part) > 0 && (part[0] == ' ' || part[0] == '\t') {
+				part = part[1:]
+			}
+			for len(part) > 0 && (part[len(part)-1] == ' ' || part[len(part)-1] == '\t') {
+				part = part[:len(part)-1]
+			}
+			if part != "" {
+				res = append(res, part)
+			}
+			start = i + 1
+		}
+	}
+	return res
+}
 
+// maskDatabaseHost extracts and prints only the database host part for logging.
+// It avoids logging credentials while still being useful for debugging.
+func maskDatabaseHost(dsn string) string {
+	// Very small helper: find '@' then take host:port until next '/' or '?'
+	at := -1
+	for i := 0; i < len(dsn); i++ {
+		if dsn[i] == '@' {
+			at = i
+			break
+		}
+	}
+	if at == -1 {
+		// no credentials case like postgres://host:5432/db
+		start := 0
+		for i := 0; i < len(dsn); i++ {
+			if dsn[i] == '/' {
+				start = i + 2 // skip '//'
+				break
+			}
+		}
+		host := ""
+		for i := start; i < len(dsn); i++ {
+			if dsn[i] == '/' || dsn[i] == '?' {
+				break
+			}
+			host += string(dsn[i])
+		}
+		return host
+	}
+	host := ""
+	for i := at + 1; i < len(dsn); i++ {
+		if dsn[i] == '/' || dsn[i] == '?' {
+			break
+		}
+		host += string(dsn[i])
+	}
+	return host
+}

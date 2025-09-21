@@ -1,15 +1,15 @@
-import React from 'react';
-import { useParams } from 'react-router-dom';
 import {
-  Box,
-  Typography,
-  CircularProgress,
-  Alert,
-  AppBar,
-  Toolbar,
-  Container,
+    Alert,
+    AppBar,
+    Box,
+    CircularProgress,
+    Container,
+    Toolbar,
+    Typography,
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import React from 'react';
+import { useParams } from 'react-router-dom';
 import { boardsApi } from '../services/api';
 
 const PublicBoardPage: React.FC = () => {
@@ -92,8 +92,20 @@ const PublicBoardPage: React.FC = () => {
         }}
       >
         {/* Board Items */}
-        {board.items?.map((item) => {
-          const isPostIt = item.type === 'post-it';
+        {board.items?.map((item: any) => {
+          let meta: any = undefined;
+          if (item && typeof item.metadata === 'object') {
+            meta = item.metadata;
+          } else if (item && typeof item.metadata === 'string') {
+            try {
+              const decoded = atob(item.metadata);
+              meta = JSON.parse(decoded);
+            } catch {
+              try { meta = JSON.parse(item.metadata); } catch {}
+            }
+          }
+          const variant = meta?.variant;
+          const isPostIt = variant !== 'suspect-card';
           
           return (
             <Box
@@ -106,7 +118,7 @@ const PublicBoardPage: React.FC = () => {
                 height: item.height,
                 transform: `rotate(${item.rotation}deg)`,
                 zIndex: item.z_index,
-                bgcolor: isPostIt ? '#ffeb3b' : '#f5f5f5',
+                bgcolor: isPostIt ? (item.color || '#ffeb3b') : (item.color || '#f5f5f5'),
                 border: isPostIt ? 'none' : '1px solid #ddd',
                 borderRadius: isPostIt ? '2px' : '4px',
                 boxShadow: isPostIt 

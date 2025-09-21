@@ -1,19 +1,19 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import {
-  AuthResponse,
-  LoginRequest,
-  RegisterRequest,
-  User,
-  Board,
-  BoardItem,
-  BoardConnection,
-  CreateBoardRequest,
-  UpdateBoardRequest,
-  CreateBoardItemRequest,
-  UpdateBoardItemRequest,
-  CreateBoardConnectionRequest,
-  ShareBoardRequest,
-  PaginatedResponse,
+    AuthResponse,
+    Board,
+    BoardConnection,
+    BoardItem,
+    CreateBoardConnectionRequest,
+    CreateBoardItemRequest,
+    CreateBoardRequest,
+    LoginRequest,
+    PaginatedResponse,
+    RegisterRequest,
+    ShareBoardRequest,
+    UpdateBoardItemRequest,
+    UpdateBoardRequest,
+    User,
 } from '../types';
 
 // Create axios instance
@@ -32,13 +32,37 @@ const createApiInstance = (baseURL: string): AxiosInstance => {
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    if (import.meta.env.MODE !== 'production') {
+      // Verbose client-side request log
+      // eslint-disable-next-line no-console
+      console.debug('[api:req]', config.method?.toUpperCase(), config.baseURL, config.url, {
+        params: config.params,
+        hasAuth: !!token,
+      });
+    }
     return config;
   });
 
   // Handle auth errors
   instance.interceptors.response.use(
-    (response) => response,
+    (response) => {
+      if (import.meta.env.MODE !== 'production') {
+        // eslint-disable-next-line no-console
+        console.debug('[api:res]', response.status, response.config.url);
+      }
+      return response;
+    },
     (error) => {
+      if (import.meta.env.MODE !== 'production') {
+        // eslint-disable-next-line no-console
+        console.debug('[api:err]', {
+          url: error.config?.url,
+          method: error.config?.method,
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message,
+        });
+      }
       if (error.response?.status === 401) {
         localStorage.removeItem('auth_token');
         window.location.href = '/login';
@@ -52,11 +76,11 @@ const createApiInstance = (baseURL: string): AxiosInstance => {
 
 // API instances
 const authApiInstance = createApiInstance(
-  process.env.REACT_APP_API_BASE_URL || 'http://localhost:8001'
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001'
 );
 
 const boardsApiInstance = createApiInstance(
-  process.env.REACT_APP_BOARDS_API_URL || 'http://localhost:8002'
+  import.meta.env.VITE_BOARDS_API_URL || 'http://localhost:8002'
 );
 
 // Auth API
@@ -109,10 +133,27 @@ export const authApi = {
 export const boardsApi = {
   // Board CRUD
   getBoards: async (page = 1, limit = 20): Promise<PaginatedResponse<Board>> => {
-    const response: AxiosResponse<PaginatedResponse<Board>> = await boardsApiInstance.get(
+    const response: AxiosResponse<any> = await boardsApiInstance.get(
       `/api/v1/boards?page=${page}&limit=${limit}`
     );
-    return response.data;
+    const data = response.data;
+    // Normalize backend response { boards, total, page, limit } -> { data, total, page, limit, has_more }
+    if (data && Array.isArray(data.data)) {
+      return data as PaginatedResponse<Board>;
+    }
+    if (data && Array.isArray(data.boards)) {
+      const total = typeof data.total === 'number' ? data.total : data.boards.length;
+      const currentPage = typeof data.page === 'number' ? data.page : page;
+      const currentLimit = typeof data.limit === 'number' ? data.limit : limit;
+      return {
+        data: data.boards,
+        total,
+        page: currentPage,
+        limit: currentLimit,
+        has_more: currentPage * currentLimit < total,
+      } as PaginatedResponse<Board>;
+    }
+    return { data: [], total: 0, page, limit, has_more: false } as PaginatedResponse<Board>;
   },
 
   getBoard: async (id: string): Promise<Board> => {

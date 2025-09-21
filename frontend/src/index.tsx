@@ -1,7 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import './index.css';
 import App from './App';
+import './index.css';
+// Vite doesn't include CRA web-vitals by default. Keep optional import if desired.
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(

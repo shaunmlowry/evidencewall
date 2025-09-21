@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
-import { useAuth } from './AuthContext';
+import { Socket, io } from 'socket.io-client';
 import { SocketMessage } from '../types';
+import { useAuth } from './AuthContext';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -32,7 +32,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   useEffect(() => {
     if (isAuthenticated && token) {
-      const socketUrl = process.env.REACT_APP_WEBSOCKET_URL || 'ws://localhost:8003';
+      const socketUrl = import.meta.env.VITE_WEBSOCKET_URL || 'ws://localhost:8003';
       
       const newSocket = io(socketUrl, {
         auth: {

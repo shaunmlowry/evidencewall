@@ -95,30 +95,30 @@ services:
         condition: service_started
     restart: unless-stopped
 
-  # Real-time Service
-  realtime-service:
-    build:
-      context: .
-      dockerfile: services/realtime/Dockerfile
-    networks:
-      - backend
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-      - AUTH_SERVICE_URL=http://auth-service:8001
-      - BOARDS_SERVICE_URL=http://boards-service:8002
-      - CORS_ORIGINS=http://localhost,https://localhost
-      - ENVIRONMENT=production
-      - LOG_LEVEL=info
-    depends_on:
-      redis:
-        condition: service_healthy
-      auth-service:
-        condition: service_started
-      boards-service:
-        condition: service_started
-    restart: unless-stopped
+  # Real-time Service (TODO: Implement when needed)
+  # realtime-service:
+  #   build:
+  #     context: .
+  #     dockerfile: services/realtime/Dockerfile
+  #   networks:
+  #     - backend
+  #   environment:
+  #     - REDIS_HOST=redis
+  #     - REDIS_PORT=6379
+  #     - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+  #     - AUTH_SERVICE_URL=http://auth-service:8001
+  #     - BOARDS_SERVICE_URL=http://boards-service:8002
+  #     - CORS_ORIGINS=http://localhost,https://localhost
+  #     - ENVIRONMENT=production
+  #     - LOG_LEVEL=info
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #     auth-service:
+  #       condition: service_started
+  #     boards-service:
+  #       condition: service_started
+  #   restart: unless-stopped
 
   # Reverse Proxy (NGINX)
   nginx:
@@ -136,7 +136,6 @@ services:
       - frontend
       - auth-service
       - boards-service
-      - realtime-service
     restart: unless-stopped
 
   # Frontend
@@ -144,17 +143,20 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/auth
+        VITE_BOARDS_API_URL: /api/boards
+        VITE_WEBSOCKET_URL: /api/realtime
     networks:
       - frontend
     environment:
-      - REACT_APP_API_BASE_URL=/api/auth
-      - REACT_APP_BOARDS_API_URL=/api/boards
-      - REACT_APP_WEBSOCKET_URL=/api/realtime
-      - REACT_APP_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - VITE_API_BASE_URL=/api/auth
+      - VITE_BOARDS_API_URL=/api/boards
+      - VITE_WEBSOCKET_URL=/api/realtime
+      - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     depends_on:
       - auth-service
       - boards-service
-      - realtime-service
     restart: unless-stopped
 
 volumes:

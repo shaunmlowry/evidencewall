@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"log"
 	"net/http"
 
 	"evidence-wall/auth-service/internal/service"
@@ -13,11 +14,11 @@ import (
 
 // AuthHandler handles authentication HTTP requests
 type AuthHandler struct {
-	authService *service.AuthService
+	authService service.AuthServiceInterface
 }
 
 // NewAuthHandler creates a new auth handler
-func NewAuthHandler(authService *service.AuthService) *AuthHandler {
+func NewAuthHandler(authService service.AuthServiceInterface) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
 	}
@@ -38,12 +39,15 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req service.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("auth:Register bind error: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	log.Printf("auth:Register attempt email=%s name=%s", req.Email, req.Name)
 	response, err := h.authService.Register(req)
 	if err != nil {
+		log.Printf("auth:Register error for email=%s: %v", req.Email, err)
 		switch err {
 		case service.ErrEmailExists:
 			c.JSON(http.StatusConflict, gin.H{"error": "Email already exists"})
@@ -53,6 +57,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	log.Printf("auth:Register success user=%s", response.User.Email)
 	c.JSON(http.StatusCreated, response)
 }
 
@@ -71,12 +76,15 @@ func (h *AuthHandler) Register(c *gin.Context) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req service.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("auth:Login bind error: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	log.Printf("auth:Login attempt email=%s", req.Email)
 	response, err := h.authService.Login(req)
 	if err != nil {
+		log.Printf("auth:Login error for email=%s: %v", req.Email, err)
 		switch err {
 		case service.ErrInvalidCredentials:
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
@@ -86,6 +94,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	log.Printf("auth:Login success user=%s", response.User.Email)
 	c.JSON(http.StatusOK, response)
 }
 
@@ -269,5 +278,3 @@ func generateRandomState() string {
 	rand.Read(b)
 	return base64.URLEncoding.EncodeToString(b)
 }
-
-

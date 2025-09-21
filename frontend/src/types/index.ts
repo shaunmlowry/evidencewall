@@ -37,10 +37,12 @@ export interface BoardUserResponse {
   created_at: string;
 }
 
+export type BackendItemType = 'text' | 'image' | 'note' | 'link';
+
 export interface BoardItem {
   id: string;
   board_id: string;
-  type: 'post-it' | 'suspect-card';
+  type: BackendItemType;
   x: number;
   y: number;
   width: number;
@@ -48,7 +50,8 @@ export interface BoardItem {
   rotation: number;
   z_index: number;
   content: string;
-  style: string;
+  color?: string;
+  metadata?: any;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -90,14 +93,15 @@ export interface UpdateBoardRequest {
 }
 
 export interface CreateBoardItemRequest {
-  type: 'post-it' | 'suspect-card';
+  type: BackendItemType;
   x: number;
   y: number;
-  width?: number;
-  height?: number;
-  rotation?: number;
-  content?: string;
-  style?: string;
+  width: number;
+  height: number;
+  content: string;
+  z_index?: number;
+  color?: string;
+  metadata?: any;
 }
 
 export interface UpdateBoardItemRequest {
@@ -105,10 +109,10 @@ export interface UpdateBoardItemRequest {
   y?: number;
   width?: number;
   height?: number;
-  rotation?: number;
   content?: string;
-  style?: string;
   z_index?: number;
+  color?: string;
+  metadata?: any;
 }
 
 export interface CreateBoardConnectionRequest {

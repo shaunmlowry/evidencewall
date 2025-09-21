@@ -10,6 +10,12 @@ help:
 	@echo "  docker-build - Build Docker images"
 	@echo "  docker-up    - Start with Docker Compose"
 	@echo "  docker-down  - Stop Docker Compose"
+	@echo ""
+	@echo "E2E Testing:"
+	@echo "  setup-e2e    - Set up E2E testing environment"
+	@echo "  test-e2e     - Run E2E tests"
+	@echo "  test-e2e-ui  - Run E2E tests with UI"
+	@echo "  test-e2e-debug - Run E2E tests in debug mode"
 
 # Development
 dev:
@@ -59,10 +65,20 @@ docker-down:
 
 # Individual service commands
 run-auth:
-	cd services/auth && air
+	@if command -v air >/dev/null 2>&1; then \
+		cd services/auth && air; \
+	else \
+		echo "air not found; falling back to 'go run'. Install air for live reload: https://github.com/cosmtrek/air"; \
+		cd services/auth && go run ./cmd/server; \
+	fi
 
 run-boards:
-	cd services/boards && air
+	@if command -v air >/dev/null 2>&1; then \
+		cd services/boards && air; \
+	else \
+		echo "air not found; falling back to 'go run'. Install air for live reload: https://github.com/cosmtrek/air"; \
+		cd services/boards && go run ./cmd/server; \
+	fi
 
 # Database commands
 migrate-up:
@@ -90,4 +106,39 @@ lint:
 	cd services/boards && golangci-lint run
 	@echo "Linting frontend..."
 	cd frontend && npm run lint
+
+# Development services for testing
+dev-services:
+	@echo "Starting development services for testing..."
+	docker-compose -f docker-compose.dev.yml up -d
+	@echo "Waiting for database to be ready..."
+	@sleep 5
+	@if command -v air >/dev/null 2>&1; then \
+		cd services/auth && air & \
+	else \
+		cd services/auth && go run ./cmd/server & \
+	fi
+	@if command -v air >/dev/null 2>&1; then \
+		cd services/boards && air & \
+	else \
+		cd services/boards && go run ./cmd/server & \
+	fi
+	@echo "Development services started!"
+
+# E2E Testing
+setup-e2e:
+	@echo "Setting up E2E testing environment..."
+	./scripts/setup-e2e-tests.sh
+
+test-e2e:
+	@echo "Running E2E tests..."
+	npx playwright test
+
+test-e2e-ui:
+	@echo "Running E2E tests with UI..."
+	npx playwright test --ui
+
+test-e2e-debug:
+	@echo "Running E2E tests in debug mode..."
+	npx playwright test --debug
 

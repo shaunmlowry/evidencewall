@@ -1,4 +1,73 @@
 services:
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile.dev
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=http://localhost/api/auth
+      - VITE_BOARDS_API_URL=http://localhost/api/boards
+      - VITE_WEBSOCKET_URL=ws://localhost/api/realtime
+    depends_on: []
+
+  # Nginx reverse proxy for dev
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile.dev
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+    networks:
+      - default
+
+  # Auth service for dev
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth/Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgres://evidencewall:evidencewall_password@postgres:5432/evidencewall?sslmode=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=dev-jwt-secret-key
+      - JWT_EXPIRY=24h
+      - CORS_ORIGINS=http://localhost,http://localhost:5173
+      - ENVIRONMENT=development
+      - LOG_LEVEL=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Boards service for dev
+  boards-service:
+    build:
+      context: .
+      dockerfile: services/boards/Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=postgres://evidencewall:evidencewall_password@postgres:5432/evidencewall?sslmode=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=dev-jwt-secret-key
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - CORS_ORIGINS=http://localhost,http://localhost:5173
+      - ENVIRONMENT=development
+      - LOG_LEVEL=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
   # Database for development
   postgres:
     image: postgres:15-alpine

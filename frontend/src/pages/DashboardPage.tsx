@@ -1,39 +1,39 @@
+import {
+    Add as AddIcon,
+    Lock as LockIcon,
+    MoreVert as MoreVertIcon,
+    People as PeopleIcon,
+    Public as PublicIcon,
+} from '@mui/icons-material';
+import {
+    Alert,
+    Box,
+    Button,
+    Card,
+    CardActions,
+    CardContent,
+    Chip,
+    Container,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    FormControl,
+    Grid,
+    IconButton,
+    InputLabel,
+    Menu,
+    MenuItem,
+    Select,
+    TextField,
+    Typography,
+} from '@mui/material';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Container,
-  Typography,
-  Button,
-  Grid,
-  Card,
-  CardContent,
-  CardActions,
-  Box,
-  Chip,
-  IconButton,
-  Menu,
-  MenuItem,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  Alert,
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  MoreVert as MoreVertIcon,
-  Public as PublicIcon,
-  People as PeopleIcon,
-  Lock as LockIcon,
-} from '@mui/icons-material';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { boardsApi } from '../services/api';
-import { Board, CreateBoardRequest, BoardVisibility } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { boardsApi } from '../services/api';
+import { Board, BoardVisibility, CreateBoardRequest } from '../types';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -146,13 +146,14 @@ const DashboardPage: React.FC = () => {
     <Container maxWidth="lg">
       <Box mb={4}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-          <Typography variant="h4" component="h1">
+          <Typography variant="h4" component="h1" data-testid="dashboard-title">
             My Boards
           </Typography>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => setCreateDialogOpen(true)}
+            data-testid="create-board-button"
           >
             Create Board
           </Button>
@@ -267,6 +268,7 @@ const DashboardPage: React.FC = () => {
             value={newBoard.title}
             onChange={(e) => setNewBoard({ ...newBoard, title: e.target.value })}
             sx={{ mb: 2 }}
+            inputProps={{ 'data-testid': 'board-title-input' }}
           />
           <TextField
             margin="dense"
@@ -278,6 +280,7 @@ const DashboardPage: React.FC = () => {
             value={newBoard.description}
             onChange={(e) => setNewBoard({ ...newBoard, description: e.target.value })}
             sx={{ mb: 2 }}
+            inputProps={{ 'data-testid': 'board-description-input' }}
           />
           <FormControl fullWidth>
             <InputLabel>Visibility</InputLabel>
@@ -298,6 +301,7 @@ const DashboardPage: React.FC = () => {
             onClick={handleCreateBoard}
             variant="contained"
             disabled={createBoardMutation.isPending}
+            data-testid="create-board-submit"
           >
             {createBoardMutation.isPending ? 'Creating...' : 'Create'}
           </Button>

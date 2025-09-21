@@ -1,0 +1,19 @@
+{
+  "name": "evidence-wall",
+  "version": "1.0.0",
+  "description": "Collaborative Investigation Board - E2E Tests",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report",
+    "test:e2e:install": "playwright install"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

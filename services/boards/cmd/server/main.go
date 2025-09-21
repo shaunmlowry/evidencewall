@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 
@@ -50,6 +51,8 @@ func main() {
 	// Load configuration
 	cfg := config.Load()
 
+	log.Printf("boards:starting ENVIRONMENT=%s DB_HOST=%s REDIS=%s:%s", cfg.Environment, maskDatabaseHost(cfg.DatabaseURL), cfg.RedisHost, cfg.RedisPort)
+
 	// Set Gin mode
 	if cfg.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -58,7 +61,7 @@ func main() {
 	// Connect to database
 	db, err := database.Connect(cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("boards:db connect error: %v", err)
 	}
 
 	// Run migrations
@@ -78,6 +81,13 @@ func main() {
 		DB:       0,
 	})
 
+	// Simple connectivity check to Redis
+	if err := rdb.Ping(context.Background()).Err(); err != nil {
+		log.Printf("boards:redis ping error: %v", err)
+	} else {
+		log.Printf("boards:redis connected addr=%s:%s", cfg.RedisHost, cfg.RedisPort)
+	}
+
 	// Initialize JWT manager
 	jwtManager := auth.NewJWTManager(cfg.JWTSecret, 0) // Expiry not used for validation
 
@@ -96,8 +106,24 @@ func main() {
 	// Setup router
 	router := gin.Default()
 
+	// Configure trusted proxies (empty string means trust none)
+	if cfg.TrustedProxies == "" {
+		if err := router.SetTrustedProxies(nil); err != nil {
+			log.Printf("Failed to set trusted proxies: %v", err)
+		}
+	} else {
+		proxies := []string{}
+		for _, p := range splitAndTrim(cfg.TrustedProxies) {
+			proxies = append(proxies, p)
+		}
+		if err := router.SetTrustedProxies(proxies); err != nil {
+			log.Printf("Failed to set trusted proxies: %v", err)
+		}
+	}
+
 	// Add middleware
 	router.Use(middleware.CORSMiddleware(cfg.CORSOrigins))
+	router.Use(middleware.RequestLogger("boards", cfg.Environment))
 
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
@@ -123,22 +149,22 @@ func main() {
 			boards.PUT("/:id/users/:userId/permission", boardHandler.UpdateUserPermission)
 		}
 
-		// Board items routes
-		items := v1.Group("/boards/:boardId/items")
+		// Board items routes (use consistent board :id and distinct item :itemId)
+		items := boards.Group("/:id/items")
 		{
 			items.GET("", boardHandler.ListBoardItems)
 			items.POST("", boardHandler.CreateBoardItem)
-			items.PUT("/:id", boardHandler.UpdateBoardItem)
-			items.DELETE("/:id", boardHandler.DeleteBoardItem)
+			items.PUT("/:itemId", boardHandler.UpdateBoardItem)
+			items.DELETE("/:itemId", boardHandler.DeleteBoardItem)
 		}
 
-		// Board connections routes
-		connections := v1.Group("/boards/:boardId/connections")
+		// Board connections routes (use consistent board :id and distinct connection :connectionId)
+		connections := boards.Group("/:id/connections")
 		{
 			connections.GET("", boardHandler.ListBoardConnections)
 			connections.POST("", boardHandler.CreateBoardConnection)
-			connections.PUT("/:id", boardHandler.UpdateBoardConnection)
-			connections.DELETE("/:id", boardHandler.DeleteBoardConnection)
+			connections.PUT("/:connectionId", boardHandler.UpdateBoardConnection)
+			connections.DELETE("/:connectionId", boardHandler.DeleteBoardConnection)
 		}
 	}
 
@@ -160,10 +186,68 @@ func main() {
 		port = "8002"
 	}
 
-	log.Printf("Boards service starting on port %s", port)
+	log.Printf("boards:listening port=%s", port)
 	if err := router.Run(":" + port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		log.Fatalf("boards:server start error: %v", err)
 	}
 }
 
+// splitAndTrim splits a comma-separated string and trims whitespace entries, skipping empties.
+func splitAndTrim(s string) []string {
+	res := []string{}
+	start := 0
+	for i := 0; i <= len(s); i++ {
+		if i == len(s) || s[i] == ',' {
+			part := s[start:i]
+			// trim spaces
+			for len(part) > 0 && (part[0] == ' ' || part[0] == '\t') {
+				part = part[1:]
+			}
+			for len(part) > 0 && (part[len(part)-1] == ' ' || part[len(part)-1] == '\t') {
+				part = part[:len(part)-1]
+			}
+			if part != "" {
+				res = append(res, part)
+			}
+			start = i + 1
+		}
+	}
+	return res
+}
 
+// maskDatabaseHost extracts and prints only the database host part for logging.
+// It avoids logging credentials while still being useful for debugging.
+func maskDatabaseHost(dsn string) string {
+	at := -1
+	for i := 0; i < len(dsn); i++ {
+		if dsn[i] == '@' {
+			at = i
+			break
+		}
+	}
+	if at == -1 {
+		start := 0
+		for i := 0; i < len(dsn); i++ {
+			if dsn[i] == '/' {
+				start = i + 2
+				break
+			}
+		}
+		host := ""
+		for i := start; i < len(dsn); i++ {
+			if dsn[i] == '/' || dsn[i] == '?' {
+				break
+			}
+			host += string(dsn[i])
+		}
+		return host
+	}
+	host := ""
+	for i := at + 1; i < len(dsn); i++ {
+		if dsn[i] == '/' || dsn[i] == '?' {
+			break
+		}
+		host += string(dsn[i])
+	}
+	return host
+}

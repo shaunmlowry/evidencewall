@@ -11,9 +11,9 @@ import (
 type PermissionLevel string
 
 const (
-	PermissionRead      PermissionLevel = "read"
-	PermissionReadWrite PermissionLevel = "read_write"
-	PermissionAdmin     PermissionLevel = "admin"
+	PermissionRead  PermissionLevel = "read"
+	PermissionWrite PermissionLevel = "write"
+	PermissionAdmin PermissionLevel = "admin"
 )
 
 // BoardVisibility represents who can access the board
@@ -37,9 +37,10 @@ type Board struct {
 	DeletedAt   gorm.DeletedAt  `json:"-" gorm:"index"`
 
 	// Relationships
-	Owner BoardUser   `json:"owner,omitempty" gorm:"foreignKey:OwnerID;references:UserID"`
-	Users []BoardUser `json:"users,omitempty" gorm:"foreignKey:BoardID"`
-	Items []BoardItem `json:"items,omitempty" gorm:"foreignKey:BoardID"`
+	Owner       User              `json:"owner,omitempty" gorm:"foreignKey:OwnerID"`
+	Users       []BoardUser       `json:"users,omitempty" gorm:"foreignKey:BoardID"`
+	Items       []BoardItem       `json:"items,omitempty" gorm:"foreignKey:BoardID"`
+	Connections []BoardConnection `json:"connections,omitempty" gorm:"foreignKey:BoardID"`
 }
 
 // BoardUser represents the many-to-many relationship between boards and users
@@ -56,11 +57,21 @@ type BoardUser struct {
 	User  User  `json:"user,omitempty" gorm:"foreignKey:UserID"`
 }
 
+// ItemType represents the type of board item
+type ItemType string
+
+const (
+	ItemTypeText  ItemType = "text"
+	ItemTypeImage ItemType = "image"
+	ItemTypeNote  ItemType = "note"
+	ItemTypeLink  ItemType = "link"
+)
+
 // BoardItem represents an item on the board (post-it note or suspect card)
 type BoardItem struct {
 	ID        uuid.UUID      `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	BoardID   uuid.UUID      `json:"board_id" gorm:"type:uuid;not null"`
-	Type      string         `json:"type" gorm:"not null"` // "post-it" or "suspect-card"
+	Type      ItemType       `json:"type" gorm:"not null"`
 	X         float64        `json:"x" gorm:"not null"`
 	Y         float64        `json:"y" gorm:"not null"`
 	Width     float64        `json:"width" gorm:"default:200"`
@@ -68,7 +79,8 @@ type BoardItem struct {
 	Rotation  float64        `json:"rotation" gorm:"default:0"`
 	ZIndex    int            `json:"z_index" gorm:"default:1"`
 	Content   string         `json:"content"`
-	Style     string         `json:"style"` // JSON string for styling properties
+	Color     string         `json:"color"`
+	Metadata  []byte         `json:"metadata" gorm:"type:jsonb"`
 	CreatedBy uuid.UUID      `json:"created_by" gorm:"type:uuid;not null"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
@@ -176,5 +188,3 @@ func (b *Board) ToResponse(userPermission PermissionLevel) BoardResponse {
 
 	return response
 }
-
-

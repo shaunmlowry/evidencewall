@@ -2,32 +2,33 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import React from 'react';
+import { vi } from 'vitest';
 import App from './App';
 
 // Mock the AuthProvider
-jest.mock('./contexts/AuthContext', () => ({
+vi.mock('./contexts/AuthContext', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   useAuth: () => ({
     user: null,
     token: null,
     isLoading: false,
     isAuthenticated: false,
-    login: jest.fn(),
-    register: jest.fn(),
-    logout: jest.fn(),
-    updateUser: jest.fn(),
+    login: vi.fn(),
+    register: vi.fn(),
+    logout: vi.fn(),
+    updateUser: vi.fn(),
   }),
 }));
 
 // Mock the SocketProvider
-jest.mock('./contexts/SocketContext', () => ({
+vi.mock('./contexts/SocketContext', () => ({
   SocketProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   useSocket: () => ({
     socket: null,
     isConnected: false,
-    joinBoard: jest.fn(),
-    leaveBoard: jest.fn(),
-    sendMessage: jest.fn(),
+    joinBoard: vi.fn(),
+    leaveBoard: vi.fn(),
+    sendMessage: vi.fn(),
   }),
 }));
 

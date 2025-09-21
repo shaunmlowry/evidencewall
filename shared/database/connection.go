@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -15,6 +16,8 @@ import (
 
 // Connect establishes a connection to the PostgreSQL database
 func Connect(databaseURL string) (*gorm.DB, error) {
+	// Log the target host without credentials for debugging
+	log.Printf("db:attempt connect dsn_host=%s", extractHost(databaseURL))
 	// Configure GORM logger
 	logLevel := logger.Silent
 	if os.Getenv("ENVIRONMENT") == "development" {
@@ -45,12 +48,14 @@ func Connect(databaseURL string) (*gorm.DB, error) {
 	sqlDB.SetMaxOpenConns(100)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
-	// Test connection
-	if err := sqlDB.Ping(); err != nil {
+	// Test connection with timeout to fail fast in dev
+	pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := sqlDB.PingContext(pingCtx); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	log.Println("Successfully connected to database")
+	log.Printf("db:connected host=%s", extractHost(databaseURL))
 	return db, nil
 }
 
@@ -101,4 +106,33 @@ func CreateIndexes(db *gorm.DB) error {
 	return nil
 }
 
-
+// extractHost returns the host:port part of a Postgres DSN without credentials.
+func extractHost(dsn string) string {
+	at := -1
+	for i := 0; i < len(dsn); i++ {
+		if dsn[i] == '@' {
+			at = i
+			break
+		}
+	}
+	start := 0
+	if at == -1 {
+		// find //
+		for i := 0; i+1 < len(dsn); i++ {
+			if dsn[i] == '/' && dsn[i+1] == '/' {
+				start = i + 2
+				break
+			}
+		}
+	} else {
+		start = at + 1
+	}
+	host := ""
+	for i := start; i < len(dsn); i++ {
+		if dsn[i] == '/' || dsn[i] == '?' {
+			break
+		}
+		host += string(dsn[i])
+	}
+	return host
+}
