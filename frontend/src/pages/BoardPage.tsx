@@ -22,7 +22,7 @@ import { boardsApi } from '../services/api';
 const BoardPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { joinBoard, leaveBoard } = useSocket();
+  const { joinBoard, leaveBoard, socket } = useSocket();
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [isConnecting, setIsConnecting] = useState(false);
   const [items, setItems] = useState<Array<{
@@ -66,6 +66,85 @@ const BoardPage: React.FC = () => {
       return () => leaveBoard(id);
     }
   }, [id, joinBoard, leaveBoard]);
+
+  // Listen for realtime updates
+  useEffect(() => {
+    if (!socket || !id) return;
+    const handler = (raw: any) => {
+      try {
+        const msg = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (!msg || msg.board_id !== id) return;
+        switch (msg.event) {
+          case 'item_created': {
+            const it = msg.data;
+            setItems((prev) => {
+              if (prev.some((p) => p.id === it.id)) return prev;
+              return [
+                ...prev,
+                {
+                  id: it.id,
+                  type: ((it.metadata && (JSON.parse(typeof it.metadata === 'string' ? it.metadata : JSON.stringify(it.metadata)).variant)) === 'suspect-card') ? 'suspect-card' : 'post-it',
+                  x: it.x,
+                  y: it.y,
+                  width: it.width,
+                  height: it.height,
+                  rotation: it.rotation ?? 0,
+                  z_index: it.z_index ?? 1,
+                  content: it.content || '',
+                  color: it.color,
+                  serverId: it.id,
+                },
+              ];
+            });
+            break;
+          }
+          case 'item_updated': {
+            const it = msg.data;
+            setItems((prev) => prev.map((p) => (p.id === it.id ? {
+              ...p,
+              x: it.x ?? p.x,
+              y: it.y ?? p.y,
+              width: it.width ?? p.width,
+              height: it.height ?? p.height,
+              z_index: it.z_index ?? p.z_index,
+              content: it.content ?? p.content,
+              color: it.color ?? p.color,
+            } : p)));
+            break;
+          }
+          case 'item_deleted': {
+            const delId = msg.data?.id;
+            setItems((prev) => prev.filter((p) => p.id !== delId));
+            break;
+          }
+          case 'connection_created': {
+            const c = msg.data;
+            setConnections((prev) => prev.some((pc) => pc.id === c.id) ? prev : [...prev, {
+              id: c.id,
+              from_item_id: c.from_item_id,
+              to_item_id: c.to_item_id,
+            }]);
+            break;
+          }
+          case 'connection_updated': {
+            // Currently style-only, ignore for now
+            break;
+          }
+          case 'connection_deleted': {
+            const delId = msg.data?.id;
+            setConnections((prev) => prev.filter((c) => c.id !== delId));
+            break;
+          }
+        }
+      } catch {}
+    };
+    socket.on('board_update', handler);
+    return () => {
+      socket.off('board_update', handler);
+    };
+  }, [socket, id]);
+
+  // (removed debug global click listener)
 
   const handleAddPostIt = () => {
     if (!id) return;
@@ -196,7 +275,9 @@ const BoardPage: React.FC = () => {
   }, [board]);
 
   const onItemMouseDown = useCallback((e: React.MouseEvent, itemId: string) => {
-    if (isConnecting) return;
+    if (isConnecting) {
+      return;
+    }
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const item = items.find((it) => it.id === itemId);
@@ -224,7 +305,9 @@ const BoardPage: React.FC = () => {
   }, [dragging.itemId, id, items]);
 
   const onItemClick = useCallback((itemId: string) => {
-    if (!isConnecting) return;
+    if (!isConnecting) {
+      return;
+    }
     if (!firstConnectId) {
       setFirstConnectId(itemId);
     } else if (firstConnectId !== itemId) {
@@ -248,13 +331,16 @@ const BoardPage: React.FC = () => {
         } as any)
         .then((created) => {
           // Update connection with server data, keeping frontend item IDs for rendering
-          setConnections((prev) => prev.map((c) => (c.id === localId ? { 
-            id: created.id, 
-            from_item_id: firstConnectId, // Keep frontend IDs for rendering
-            to_item_id: itemId 
-          } : c)));
+          setConnections((prev) => {
+            const updated = prev.map((c) => (c.id === localId ? { 
+              id: created.id, 
+              from_item_id: firstConnectId, // Keep frontend IDs for rendering
+              to_item_id: itemId 
+            } : c));
+            return updated;
+          });
         })
-        .catch(() => {
+        .catch((error) => {
           // Revert local if failed
           setConnections((prev) => prev.filter((c) => c.id !== localId));
         });
@@ -507,9 +593,20 @@ const BoardItemComponent: React.FC<BoardItemComponentProps> = ({
         } : {},
       }}
       onMouseDown={canEdit ? onMouseDown : undefined}
-      onClick={onClick}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
       data-testid="board-item"
-      onDoubleClick={() => canEdit && setIsEditing(true)}
+      onDoubleClick={() => {
+        if (!canEdit) return;
+        // If content is just the placeholder, clear it when entering edit mode
+        const trimmed = (item.content || '').trim();
+        if (isPostIt && (!trimmed || trimmed === 'Evidence notes...')) {
+          setDraft('');
+        }
+        setIsEditing(true);
+      }}
     >
       {/* Pushpin (for all item types) */}
       <Box
@@ -539,13 +636,11 @@ const BoardItemComponent: React.FC<BoardItemComponentProps> = ({
           onBlur={commit}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.shiftKey || isPostIt)) {
-              // Allow Shift+Enter for newline, plain Enter commits for post-it
               if (!e.shiftKey) {
                 e.preventDefault();
                 commit();
               }
             } else if (e.key === 'Enter' && !isPostIt) {
-              // For suspect card, Enter commits as well
               e.preventDefault();
               commit();
             } else if (e.key === 'Escape') {
@@ -556,6 +651,7 @@ const BoardItemComponent: React.FC<BoardItemComponentProps> = ({
           }}
           autoFocus
           inputProps={{ 'data-testid': 'item-edit-input' }}
+          placeholder={isPostIt ? '' : undefined}
           sx={{
             '& .MuiInputBase-input': {
               fontFamily: isPostIt ? '"Courier New", monospace' : undefined,
@@ -602,14 +698,133 @@ const BoardItemComponent: React.FC<BoardItemComponentProps> = ({
             >
               👤
             </Box>
-            
-            {/* Suspect info */}
-            <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
-              {(item.content?.split('\n')[0] || 'Suspect Name')}
-            </Typography>
-            <Typography variant="body2" color="textSecondary" sx={{ whiteSpace: 'pre-wrap' }}>
-              {item.content || 'Age: Unknown\nLast seen:\nNotes:'}
-            </Typography>
+
+            {(() => {
+              // Helpers to parse/format the suspect card content
+              const parse = (content: string) => {
+                const lines = (content || '').split('\n');
+                const name = (lines[0] || '').trim();
+                const ageLine = lines.find((l) => l.trim().toLowerCase().startsWith('age:')) || 'Age:';
+                const lastSeenLine = lines.find((l) => l.trim().toLowerCase().startsWith('last seen:')) || 'Last seen:';
+                const notesIndex = lines.findIndex((l) => l.trim().toLowerCase().startsWith('notes:'));
+                const age = ageLine.split(':').slice(1).join(':').trim();
+                const lastSeen = lastSeenLine.split(':').slice(1).join(':').trim();
+                const notes = notesIndex >= 0 ? lines.slice(notesIndex + 1).join('\n') : '';
+                return { name, age, lastSeen, notes };
+              };
+              const format = (s: { name: string; age: string; lastSeen: string; notes: string }) => {
+                const header = `${s.name || ''}`;
+                const ageL = `Age: ${s.age || ''}`;
+                const lastL = `Last seen: ${s.lastSeen || ''}`;
+                const notesHeader = 'Notes:';
+                const notesBody = (s.notes || '').length ? `\n${s.notes}` : '';
+                return `${header}\n${ageL}\n${lastL}\n${notesHeader}${notesBody}`;
+              };
+
+              const stopDrag = (e: React.MouseEvent) => e.stopPropagation();
+              const initial = parse(item.content || '');
+              const [suspect, setSuspect] = React.useState(initial);
+
+              React.useEffect(() => {
+                setSuspect(parse(item.content || ''));
+              }, [item.content]);
+
+              const commitSuspect = () => {
+                onUpdateContent(format(suspect));
+              };
+
+              if (!canEdit) {
+                return (
+                  <>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
+                      {suspect.name || 'Suspect Name'}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary" sx={{ whiteSpace: 'pre-wrap' }}>
+                      {`Age: ${suspect.age || 'Unknown'}\nLast seen: ${suspect.lastSeen || ''}\nNotes:`}
+                    </Typography>
+                    {suspect.notes && (
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mt: 1 }}>
+                        {suspect.notes}
+                      </Typography>
+                    )}
+                  </>
+                );
+              }
+
+              return (
+                <Box>
+                  <TextField
+                    label="Name"
+                    value={suspect.name}
+                    onChange={(e) => setSuspect((s) => ({ ...s, name: e.target.value }))}
+                    onBlur={commitSuspect}
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    sx={{
+                      mb: 1,
+                      '& .MuiInputBase-input::placeholder': { opacity: 1 },
+                      '&.Mui-focused .MuiInputBase-input::placeholder': { opacity: 0 }
+                    }}
+                    onMouseDown={stopDrag}
+                    placeholder="Suspect Name"
+                    inputProps={{ 'data-testid': 'suspect-name-input' }}
+                  />
+                  <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                    <TextField
+                      label="Age"
+                      value={suspect.age}
+                      onChange={(e) => setSuspect((s) => ({ ...s, age: e.target.value }))}
+                      onBlur={commitSuspect}
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        width: 140,
+                        '& .MuiInputBase-input::placeholder': { opacity: 1 },
+                        '&.Mui-focused .MuiInputBase-input::placeholder': { opacity: 0 }
+                      }}
+                      onMouseDown={stopDrag}
+                      placeholder="Unknown"
+                      inputProps={{ 'data-testid': 'suspect-age-input' }}
+                    />
+                    <TextField
+                      label="Last seen"
+                      value={suspect.lastSeen}
+                      onChange={(e) => setSuspect((s) => ({ ...s, lastSeen: e.target.value }))}
+                      onBlur={commitSuspect}
+                      variant="outlined"
+                      size="small"
+                      fullWidth
+                      onMouseDown={stopDrag}
+                      sx={{
+                        '& .MuiInputBase-input::placeholder': { opacity: 1 },
+                        '&.Mui-focused .MuiInputBase-input::placeholder': { opacity: 0 }
+                      }}
+                      placeholder="Location / time"
+                      inputProps={{ 'data-testid': 'suspect-lastseen-input' }}
+                    />
+                  </Box>
+                  <TextField
+                    label="Notes"
+                    value={suspect.notes}
+                    onChange={(e) => setSuspect((s) => ({ ...s, notes: e.target.value }))}
+                    onBlur={commitSuspect}
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    multiline
+                    minRows={3}
+                    onMouseDown={stopDrag}
+                    sx={{
+                      '& .MuiInputBase-input::placeholder': { opacity: 1 },
+                      '&.Mui-focused .MuiInputBase-input::placeholder': { opacity: 0 }
+                    }}
+                    placeholder="Add notes..."
+                    inputProps={{ 'data-testid': 'suspect-notes-input' }}
+                  />
+                </Box>
+              );
+            })()}
           </Box>
         )
       )}

@@ -130,10 +130,14 @@ func main() {
 		c.JSON(200, gin.H{"status": "healthy", "service": "boards"})
 	})
 
+	// (removed debug NoRoute handler)
+
 	// API routes
 	v1 := router.Group("/api/v1")
 	v1.Use(middleware.AuthMiddleware(jwtManager))
 	{
+		// (removed temporary test route)
+
 		// Board routes
 		boards := v1.Group("/boards")
 		{
@@ -159,13 +163,10 @@ func main() {
 		}
 
 		// Board connections routes (use consistent board :id and distinct connection :connectionId)
-		connections := boards.Group("/:id/connections")
-		{
-			connections.GET("", boardHandler.ListBoardConnections)
-			connections.POST("", boardHandler.CreateBoardConnection)
-			connections.PUT("/:connectionId", boardHandler.UpdateBoardConnection)
-			connections.DELETE("/:connectionId", boardHandler.DeleteBoardConnection)
-		}
+		boards.GET("/:id/connections", boardHandler.ListBoardConnections)
+		boards.POST("/:id/connections", boardHandler.CreateBoardConnection)
+		boards.PUT("/:id/connections/:connectionId", boardHandler.UpdateBoardConnection)
+		boards.DELETE("/:id/connections/:connectionId", boardHandler.DeleteBoardConnection)
 	}
 
 	// Public routes (for public boards)

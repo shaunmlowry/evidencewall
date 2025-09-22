@@ -96,29 +96,21 @@ services:
     restart: unless-stopped
 
   # Real-time Service (TODO: Implement when needed)
-  # realtime-service:
-  #   build:
-  #     context: .
-  #     dockerfile: services/realtime/Dockerfile
-  #   networks:
-  #     - backend
-  #   environment:
-  #     - REDIS_HOST=redis
-  #     - REDIS_PORT=6379
-  #     - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-  #     - AUTH_SERVICE_URL=http://auth-service:8001
-  #     - BOARDS_SERVICE_URL=http://boards-service:8002
-  #     - CORS_ORIGINS=http://localhost,https://localhost
-  #     - ENVIRONMENT=production
-  #     - LOG_LEVEL=info
-  #   depends_on:
-  #     redis:
-  #       condition: service_healthy
-  #     auth-service:
-  #       condition: service_started
-  #     boards-service:
-  #       condition: service_started
-  #   restart: unless-stopped
+  realtime-service:
+    build:
+      context: .
+      dockerfile: services/realtime/Dockerfile
+    networks:
+      - backend
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - ENVIRONMENT=production
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
 
   # Reverse Proxy (NGINX)
   nginx:
@@ -136,6 +128,7 @@ services:
       - frontend
       - auth-service
       - boards-service
+      - realtime-service
     restart: unless-stopped
 
   # Frontend

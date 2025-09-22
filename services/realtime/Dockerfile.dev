@@ -1,0 +1,11 @@
+FROM golang:1.21-alpine
+WORKDIR /app
+RUN apk add --no-cache bash git build-base
+COPY shared ./shared
+COPY services/realtime ./services/realtime
+WORKDIR /app/services/realtime
+RUN go mod download
+EXPOSE 8003
+CMD ["go", "run", "./cmd/server"]
+
+

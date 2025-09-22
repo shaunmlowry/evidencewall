@@ -32,13 +32,12 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   useEffect(() => {
     if (isAuthenticated && token) {
-      const socketUrl = import.meta.env.VITE_WEBSOCKET_URL || 'ws://localhost:8003';
-      
+      const baseUrl = import.meta.env.VITE_WEBSOCKET_URL || 'http://localhost/api/realtime';
+      const socketUrl = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
+
       const newSocket = io(socketUrl, {
-        auth: {
-          token,
-        },
         transports: ['websocket'],
+        path: '/api/realtime/socket.io/',
       });
 
       newSocket.on('connect', () => {
