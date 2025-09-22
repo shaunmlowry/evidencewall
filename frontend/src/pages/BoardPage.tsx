@@ -979,22 +979,30 @@ const BoardItemComponent: React.FC<BoardItemComponentProps> = ({
               const stopDrag = (e: React.MouseEvent) => e.stopPropagation();
               const initial = parse(item.content || '');
               const [suspect, setSuspect] = React.useState(initial);
+              const [suspectIsEditing, setSuspectIsEditing] = React.useState(false);
 
               React.useEffect(() => {
                 setSuspect(parse(item.content || ''));
               }, [item.content]);
 
+              // Sync with parent editing state when double-clicked
+              React.useEffect(() => {
+                setSuspectIsEditing(isEditing);
+              }, [isEditing]);
+
               const commitSuspect = () => {
                 onUpdateContent(format(suspect));
+                setSuspectIsEditing(false);
+                setIsEditing(false); // Also sync parent state
               };
 
               const handleFieldClick = (e: React.MouseEvent) => {
-                if (isEditing) {
+                if (suspectIsEditing) {
                   handleClick(e, true); // Mark as editable click to prevent selection
                 }
               };
 
-              if (!canEdit || !isEditing) {
+              if (!canEdit || !suspectIsEditing) {
                 return (
                   <>
                     <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
