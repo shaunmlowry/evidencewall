@@ -190,12 +190,55 @@ const BoardPage: React.FC = () => {
 
   // (removed debug global click listener)
 
+  // Utility function to calculate visible viewport bounds in board coordinates
+  const getVisibleBounds = () => {
+    if (!canvasRef.current) {
+      return { minX: 0, minY: 0, maxX: 400, maxY: 300 };
+    }
+    
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    const viewportWidth = canvasRect.width;
+    const viewportHeight = canvasRect.height;
+    
+    // Convert viewport bounds to board coordinates
+    // Account for zoom and pan transformations
+    const minX = -panX / zoom;
+    const minY = -panY / zoom;
+    const maxX = minX + viewportWidth / zoom;
+    const maxY = minY + viewportHeight / zoom;
+    
+    return { minX, minY, maxX, maxY };
+  };
+
+  // Utility function to get a random position within visible bounds
+  const getRandomPositionInViewport = (itemWidth: number, itemHeight: number) => {
+    const bounds = getVisibleBounds();
+    
+    // Ensure the item fits within the visible area with some padding
+    const padding = 20;
+    const maxX = Math.max(bounds.minX + padding, bounds.maxX - itemWidth - padding);
+    const maxY = Math.max(bounds.minY + padding, bounds.maxY - itemHeight - padding);
+    
+    // If the visible area is too small, place at center of viewport
+    if (maxX <= bounds.minX + padding || maxY <= bounds.minY + padding) {
+      return {
+        x: bounds.minX + (bounds.maxX - bounds.minX) / 2 - itemWidth / 2,
+        y: bounds.minY + (bounds.maxY - bounds.minY) / 2 - itemHeight / 2
+      };
+    }
+    
+    return {
+      x: bounds.minX + padding + Math.random() * (maxX - bounds.minX - padding),
+      y: bounds.minY + padding + Math.random() * (maxY - bounds.minY - padding)
+    };
+  };
+
   const handleAddPostIt = () => {
     if (!id) return;
     const now = Date.now();
     const tempId = `temp-${now}`;
-    // Place items in larger board space (4x larger than before)
-    const position = { x: 400 + Math.random() * 800, y: 560 + Math.random() * 480 };
+    // Place items in visible viewport area
+    const position = getRandomPositionInViewport(200, 200);
     const newItem = {
       id: tempId,
       type: 'post-it' as const,
@@ -234,15 +277,15 @@ const BoardPage: React.FC = () => {
     if (!id) return;
     const now = Date.now();
     const tempId = `temp-${now}`;
-    // Place items in larger board space (4x larger than before)
-    const position = { x: 720 + Math.random() * 960, y: 720 + Math.random() * 480 };
+    // Place items in visible viewport area
+    const position = getRandomPositionInViewport(280, 400);
     const newItem = {
       id: tempId,
       type: 'suspect-card' as const,
       x: position.x,
       y: position.y,
       width: 280,
-      height: 360,
+      height: 400,
       rotation: 0,
       z_index: items.length + 1,
       content: 'Suspect Name\nAge: Unknown\nLast seen:\nNotes:',
@@ -1043,7 +1086,19 @@ const SuspectCardContent: React.FC<SuspectCardContentProps> = ({
           {`Age: ${suspect.age || 'Unknown'}\nLast seen: ${suspect.lastSeen || ''}\nNotes:`}
         </Typography>
         {suspect.notes && (
-          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mt: 1 }}>
+          <Typography 
+            variant="body2" 
+            sx={{ 
+              whiteSpace: 'pre-wrap', 
+              mt: 1,
+              maxHeight: '120px',
+              overflow: 'auto',
+              padding: '4px',
+              border: '1px solid #e0e0e0',
+              borderRadius: '4px',
+              backgroundColor: '#fafafa'
+            }}
+          >
             {suspect.notes}
           </Typography>
         )}
