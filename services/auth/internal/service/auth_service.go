@@ -278,8 +278,8 @@ func (s *AuthService) GoogleCallback(code string) (*AuthResponse, error) {
 		}
 
 		if user != nil {
-			// Link Google account to existing user
-			user.GoogleID = googleUser.ID
+            // Link Google account to existing user
+            user.GoogleID = &googleUser.ID
 			if user.Avatar == "" {
 				user.Avatar = googleUser.Picture
 			}
@@ -288,11 +288,11 @@ func (s *AuthService) GoogleCallback(code string) (*AuthResponse, error) {
 			}
 		} else {
 			// Create new user
-			user = &models.User{
+            user = &models.User{
 				Email:    googleUser.Email,
 				Name:     googleUser.Name,
 				Avatar:   googleUser.Picture,
-				GoogleID: googleUser.ID,
+                GoogleID: func() *string { v := googleUser.ID; return &v }(),
 				Password: uuid.New().String(), // Random password for Google users
 				Verified: true,                // Google accounts are pre-verified
 				Active:   true,

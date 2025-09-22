@@ -63,6 +63,11 @@ func main() {
 		log.Fatalf("auth:db connect error: %v", err)
 	}
 
+	// Normalize data: ensure empty google_id strings are NULL so unique constraint works as intended
+	if err := db.Exec("UPDATE users SET google_id = NULL WHERE google_id = ''").Error; err != nil {
+		log.Printf("auth:data normalize warning: %v", err)
+	}
+
 	// Run migrations
 	if err := database.AutoMigrate(db); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)

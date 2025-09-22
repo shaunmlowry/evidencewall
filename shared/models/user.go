@@ -14,7 +14,7 @@ type User struct {
 	Name      string         `json:"name" gorm:"not null"`
 	Avatar    string         `json:"avatar"`
 	Password  string         `json:"-" gorm:"not null"` // Hidden from JSON
-	GoogleID  string         `json:"-" gorm:"uniqueIndex"`
+    GoogleID  *string        `json:"-" gorm:"uniqueIndex"`
 	Verified  bool           `json:"verified" gorm:"default:false"`
 	Active    bool           `json:"active" gorm:"default:true"`
 	CreatedAt time.Time      `json:"created_at"`
