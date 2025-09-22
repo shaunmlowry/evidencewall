@@ -1,7 +1,11 @@
 import {
     Link as ConnectIcon,
     StickyNote2 as PostItIcon,
-    Person as SuspectIcon
+    Person as SuspectIcon,
+    ZoomIn as ZoomInIcon,
+    ZoomOut as ZoomOutIcon,
+    CenterFocusStrong as ResetZoomIcon,
+    Delete as DeleteIcon
 } from '@mui/icons-material';
 import {
     Alert,
@@ -11,7 +15,9 @@ import {
     SpeedDialAction,
     SpeedDialIcon,
     TextField,
-    Typography
+    Typography,
+    IconButton,
+    Paper
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -44,6 +50,13 @@ const BoardPage: React.FC = () => {
     to_item_id: string;
   }>>([]);
 
+  // Zoom and scroll state
+  const [zoom, setZoom] = useState(1.0);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0, panX: 0, panY: 0 });
+
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [dragging, setDragging] = useState<{
     itemId: string | null;
@@ -51,6 +64,37 @@ const BoardPage: React.FC = () => {
     offsetY: number;
   }>({ itemId: null, offsetX: 0, offsetY: 0 });
   const [firstConnectId, setFirstConnectId] = useState<string | null>(null);
+
+  // Zoom and pan functions
+  const zoomIn = useCallback(() => {
+    setZoom(prev => Math.min(prev + 0.01, 3.0)); // Max 3x zoom
+  }, []);
+
+  const zoomOut = useCallback(() => {
+    setZoom(prev => Math.max(prev - 0.01, 0.1)); // Min 0.1x zoom
+  }, []);
+
+  const resetZoom = useCallback(() => {
+    setZoom(1.0);
+    setPanX(0);
+    setPanY(0);
+  }, []);
+
+  // Transform coordinates from screen to board space
+  const screenToBoard = useCallback((screenX: number, screenY: number) => {
+    return {
+      x: (screenX - panX) / zoom,
+      y: (screenY - panY) / zoom
+    };
+  }, [zoom, panX, panY]);
+
+  // Transform coordinates from board to screen space
+  const boardToScreen = useCallback((boardX: number, boardY: number) => {
+    return {
+      x: boardX * zoom + panX,
+      y: boardY * zoom + panY
+    };
+  }, [zoom, panX, panY]);
 
   // Fetch board data
   const { data: board, isLoading, error } = useQuery({
@@ -150,7 +194,8 @@ const BoardPage: React.FC = () => {
     if (!id) return;
     const now = Date.now();
     const tempId = `temp-${now}`;
-    const position = { x: 100 + Math.random() * 200, y: 140 + Math.random() * 120 };
+    // Place items in larger board space (4x larger than before)
+    const position = { x: 400 + Math.random() * 800, y: 560 + Math.random() * 480 };
     const newItem = {
       id: tempId,
       type: 'post-it' as const,
@@ -189,14 +234,15 @@ const BoardPage: React.FC = () => {
     if (!id) return;
     const now = Date.now();
     const tempId = `temp-${now}`;
-    const position = { x: 180 + Math.random() * 240, y: 180 + Math.random() * 120 };
+    // Place items in larger board space (4x larger than before)
+    const position = { x: 720 + Math.random() * 960, y: 720 + Math.random() * 480 };
     const newItem = {
       id: tempId,
       type: 'suspect-card' as const,
       x: position.x,
       y: position.y,
       width: 280,
-      height: 450,
+      height: 520,
       rotation: 0,
       z_index: items.length + 1,
       content: 'Suspect Name\nAge: Unknown\nLast seen:\nNotes:',
@@ -228,6 +274,36 @@ const BoardPage: React.FC = () => {
     setIsConnecting(!isConnecting);
     setFirstConnectId(null);
   };
+
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedItems.size === 0) return;
+    
+    const itemsToDelete = Array.from(selectedItems);
+    
+    // Remove items locally
+    setItems(prev => prev.filter(item => !selectedItems.has(item.id)));
+    
+    // Remove connections involving deleted items
+    setConnections(prev => prev.filter(conn => 
+      !itemsToDelete.includes(conn.from_item_id) && 
+      !itemsToDelete.includes(conn.to_item_id)
+    ));
+    
+    // Clear selection
+    setSelectedItems(new Set());
+    
+    // Delete from server (best effort)
+    if (id) {
+      itemsToDelete.forEach(itemId => {
+        const item = items.find(it => it.id === itemId);
+        if (item?.serverId) {
+          boardsApi.deleteBoardItem(id, item.serverId).catch(() => {
+            // Ignore deletion errors for now
+          });
+        }
+      });
+    }
+  }, [selectedItems, items, id]);
 
   // Initialize local items/connections when board loads
   useEffect(() => {
@@ -284,66 +360,93 @@ const BoardPage: React.FC = () => {
     if (!item) return;
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
-    setDragging({ itemId, offsetX: mouseX - item.x, offsetY: mouseY - item.y });
-  }, [isConnecting, items]);
+    const boardCoords = screenToBoard(mouseX, mouseY);
+    setDragging({ itemId, offsetX: boardCoords.x - item.x, offsetY: boardCoords.y - item.y });
+  }, [isConnecting, items, screenToBoard]);
 
   const onCanvasMouseMove = useCallback((e: React.MouseEvent) => {
+    if (isPanning && !dragging.itemId) {
+      // Handle panning
+      const deltaX = e.clientX - panStart.x;
+      const deltaY = e.clientY - panStart.y;
+      setPanX(panStart.panX + deltaX);
+      setPanY(panStart.panY + deltaY);
+      return;
+    }
+    
     if (!dragging.itemId || !canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left - dragging.offsetX;
-    const y = e.clientY - rect.top - dragging.offsetY;
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const boardCoords = screenToBoard(mouseX, mouseY);
+    const x = boardCoords.x - dragging.offsetX;
+    const y = boardCoords.y - dragging.offsetY;
     setItems((prev) => prev.map((it) => (it.id === dragging.itemId ? { ...it, x, y } : it)));
-  }, [dragging]);
+  }, [dragging, isPanning, panStart, screenToBoard]);
 
   const onCanvasMouseUp = useCallback(() => {
+    if (isPanning) {
+      setIsPanning(false);
+    }
     if (!dragging.itemId) return;
     const moved = items.find((it) => it.id === dragging.itemId);
     setDragging({ itemId: null, offsetX: 0, offsetY: 0 });
     if (!moved || !moved.serverId || !id) return;
     // Persist position best-effort
     boardsApi.updateBoardItem(id, moved.serverId, { x: moved.x, y: moved.y }).catch(() => {});
-  }, [dragging.itemId, id, items]);
+  }, [dragging.itemId, id, items, isPanning]);
 
-  const onItemClick = useCallback((itemId: string) => {
-    if (!isConnecting) {
-      return;
-    }
-    if (!firstConnectId) {
-      setFirstConnectId(itemId);
-    } else if (firstConnectId !== itemId) {
-      const localId = `temp-conn-${Date.now()}`;
-      const newConn = {
-        id: localId,
-        from_item_id: firstConnectId,
-        to_item_id: itemId,
-      };
-      setConnections((prev) => [...prev, newConn]);
-      setFirstConnectId(null);
-      // Persist to backend if both ends are server-backed
-      if (!id) return;
-      const from = items.find((it) => it.id === firstConnectId);
-      const to = items.find((it) => it.id === itemId);
-      if (!from?.serverId || !to?.serverId) return;
-      boardsApi
-        .createBoardConnection(id, {
-          from_item_id: from.serverId,
-          to_item_id: to.serverId,
-        } as any)
-        .then((created) => {
-          // Update connection with server data, keeping frontend item IDs for rendering
-          setConnections((prev) => {
-            const updated = prev.map((c) => (c.id === localId ? { 
-              id: created.id, 
-              from_item_id: firstConnectId, // Keep frontend IDs for rendering
-              to_item_id: itemId 
-            } : c));
-            return updated;
+  const onItemClick = useCallback((itemId: string, isEditableClick = false) => {
+    if (isConnecting) {
+      // Handle connection mode
+      if (!firstConnectId) {
+        setFirstConnectId(itemId);
+      } else if (firstConnectId !== itemId) {
+        const localId = `temp-conn-${Date.now()}`;
+        const newConn = {
+          id: localId,
+          from_item_id: firstConnectId,
+          to_item_id: itemId,
+        };
+        setConnections((prev) => [...prev, newConn]);
+        setFirstConnectId(null);
+        // Persist to backend if both ends are server-backed
+        if (!id) return;
+        const from = items.find((it) => it.id === firstConnectId);
+        const to = items.find((it) => it.id === itemId);
+        if (!from?.serverId || !to?.serverId) return;
+        boardsApi
+          .createBoardConnection(id, {
+            from_item_id: from.serverId,
+            to_item_id: to.serverId,
+          } as any)
+          .then((created) => {
+            // Update connection with server data, keeping frontend item IDs for rendering
+            setConnections((prev) => {
+              const updated = prev.map((c) => (c.id === localId ? { 
+                id: created.id, 
+                from_item_id: firstConnectId, // Keep frontend IDs for rendering
+                to_item_id: itemId 
+              } : c));
+              return updated;
+            });
+          })
+          .catch((error) => {
+            // Revert local if failed
+            setConnections((prev) => prev.filter((c) => c.id !== localId));
           });
-        })
-        .catch((error) => {
-          // Revert local if failed
-          setConnections((prev) => prev.filter((c) => c.id !== localId));
-        });
+      }
+    } else if (!isEditableClick) {
+      // Handle selection mode (only when not clicking on editable fields)
+      setSelectedItems(prev => {
+        const newSelection = new Set(prev);
+        if (newSelection.has(itemId)) {
+          newSelection.delete(itemId);
+        } else {
+          newSelection.add(itemId);
+        }
+        return newSelection;
+      });
     }
   }, [firstConnectId, isConnecting, items, id]);
 
@@ -353,6 +456,79 @@ const BoardPage: React.FC = () => {
     if (!item || !item.serverId || !id) return;
     boardsApi.updateBoardItem(id, item.serverId, { content: newContent }).catch(() => {});
   }, [id, items]);
+
+  // Pan and zoom event handlers
+  const onCanvasMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button === 1 || (e.button === 0 && e.ctrlKey)) { // Middle mouse or Ctrl+Left click for panning
+      e.preventDefault();
+      setIsPanning(true);
+      setPanStart({
+        x: e.clientX,
+        y: e.clientY,
+        panX,
+        panY
+      });
+    }
+  }, [panX, panY]);
+
+  const onCanvasWheel = useCallback((e: React.WheelEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      // Only zoom when Ctrl/Cmd is held down - prevent all scrolling
+      e.preventDefault();
+      e.stopPropagation();
+      const delta = e.deltaY > 0 ? -0.01 : 0.01; // 1% zoom increments
+      setZoom(prev => Math.max(0.1, Math.min(3.0, prev + delta)));
+    }
+    // Otherwise allow normal scrolling
+  }, []);
+
+  // Keyboard shortcuts and global wheel handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't handle keys if user is typing in an input
+      if ((e.target as HTMLElement)?.tagName === 'INPUT' || 
+          (e.target as HTMLElement)?.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key) {
+          case '=':
+          case '+':
+            e.preventDefault();
+            zoomIn();
+            break;
+          case '-':
+            e.preventDefault();
+            zoomOut();
+            break;
+          case '0':
+            e.preventDefault();
+            resetZoom();
+            break;
+        }
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        handleDeleteSelected();
+      }
+    };
+
+    const handleGlobalWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        // Prevent any scrolling when Ctrl/Cmd is pressed
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('wheel', handleGlobalWheel, { passive: false });
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('wheel', handleGlobalWheel);
+    };
+  }, [zoomIn, zoomOut, resetZoom, handleDeleteSelected]);
 
   if (isLoading) {
     return (
@@ -417,79 +593,139 @@ const BoardPage: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          background: `
-            radial-gradient(circle at 20% 30%, rgba(139, 119, 101, 0.8), transparent 2px),
-            radial-gradient(circle at 70% 20%, rgba(160, 142, 124, 0.6), transparent 2px),
-            radial-gradient(circle at 40% 70%, rgba(120, 100, 85, 0.7), transparent 2px),
-            radial-gradient(circle at 90% 80%, rgba(145, 125, 108, 0.5), transparent 2px),
-            linear-gradient(45deg, #c4a484 0%, #d4b896 25%, #c8a688 50%, #ddc2a4 75%, #c4a484 100%)
-          `,
-          backgroundSize: '50px 50px, 75px 75px, 60px 60px, 40px 40px, 100% 100%',
-          cursor: isConnecting ? 'crosshair' : 'default',
+          backgroundColor: '#c4a484', // Fallback solid color
+          cursor: isConnecting ? 'crosshair' : (isPanning ? 'grabbing' : 'grab'),
           overflow: 'hidden',
         }}
         data-testid="board-canvas"
+        onMouseDown={onCanvasMouseDown}
         onMouseMove={onCanvasMouseMove}
         onMouseUp={onCanvasMouseUp}
+        onWheel={onCanvasWheel}
       >
-        {/* Board Items */}
-        {items.map((item) => (
-          <BoardItemComponent
-            key={item.id}
-            item={item}
-            isSelected={selectedItems.has(item.id)}
-            isConnecting={isConnecting}
-            canEdit={canEdit}
-            onMouseDown={(e) => onItemMouseDown(e, item.id)}
-            onClick={() => onItemClick(item.id)}
-            onUpdateContent={(content) => handleUpdateContent(item.id, content)}
-          />
-        ))}
-
-        {/* Board Connections */}
-        <svg
-          style={{
+        {/* Zoomable board content container */}
+        <Box
+          sx={{
             position: 'absolute',
             top: 0,
             left: 0,
-            width: '100%',
-            height: '100%',
-            pointerEvents: 'none',
-            zIndex: 50,
+            width: '400vw', // 4x larger board
+            height: '400vh', // 4x larger board
+            transform: `translate(${panX}px, ${panY}px) scale(${zoom})`,
+            transformOrigin: '0 0',
+            background: `
+              radial-gradient(circle at 20% 30%, rgba(139, 119, 101, 0.8), transparent 2px),
+              radial-gradient(circle at 70% 20%, rgba(160, 142, 124, 0.6), transparent 2px),
+              radial-gradient(circle at 40% 70%, rgba(120, 100, 85, 0.7), transparent 2px),
+              radial-gradient(circle at 90% 80%, rgba(145, 125, 108, 0.5), transparent 2px),
+              linear-gradient(45deg, #c4a484 0%, #d4b896 25%, #c8a688 50%, #ddc2a4 75%, #c4a484 100%)
+            `,
+            backgroundSize: '50px 50px, 75px 75px, 60px 60px, 40px 40px, 100% 100%',
           }}
         >
-          {connections.map((connection) => {
-            const fromItem = items.find(item => item.id === connection.from_item_id);
-            const toItem = items.find(item => item.id === connection.to_item_id);
-            
-            if (!fromItem || !toItem) return null;
+          {/* Board Items */}
+          {items.map((item) => (
+            <BoardItemComponent
+              key={item.id}
+              item={item}
+              isSelected={selectedItems.has(item.id)}
+              isConnecting={isConnecting}
+              canEdit={canEdit}
+              onMouseDown={(e) => onItemMouseDown(e, item.id)}
+              onClick={(isEditableClick) => onItemClick(item.id, isEditableClick)}
+              onUpdateContent={(content) => handleUpdateContent(item.id, content)}
+            />
+          ))}
 
-            const x1 = fromItem.x + fromItem.width / 2;
-            const y1 = fromItem.y;
-            const x2 = toItem.x + toItem.width / 2;
-            const y2 = toItem.y;
+          {/* Board Connections */}
+          <svg
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              pointerEvents: 'none',
+              zIndex: 50,
+            }}
+          >
+            {connections.map((connection) => {
+              const fromItem = items.find(item => item.id === connection.from_item_id);
+              const toItem = items.find(item => item.id === connection.to_item_id);
+              
+              if (!fromItem || !toItem) return null;
 
-            // Calculate sag for realistic string physics
-            const distance = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-            const sagAmount = Math.min(distance * 0.1, 30);
-            
-            const midX = (x1 + x2) / 2;
-            const midY = (y1 + y2) / 2 + sagAmount;
+              const x1 = fromItem.x + fromItem.width / 2;
+              const y1 = fromItem.y;
+              const x2 = toItem.x + toItem.width / 2;
+              const y2 = toItem.y;
 
-            return (
-              <path
-                key={connection.id}
-                d={`M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`}
-                stroke="#cc0000"
-                strokeWidth="2"
-                fill="none"
-                style={{ filter: 'drop-shadow(1px 1px 2px rgba(0,0,0,0.3))' }}
-                data-testid="board-connection"
-              />
-            );
-          })}
-        </svg>
+              // Calculate sag for realistic string physics
+              const distance = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+              const sagAmount = Math.min(distance * 0.1, 30);
+              
+              const midX = (x1 + x2) / 2;
+              const midY = (y1 + y2) / 2 + sagAmount;
+
+              return (
+                <path
+                  key={connection.id}
+                  d={`M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`}
+                  stroke="#cc0000"
+                  strokeWidth="2"
+                  fill="none"
+                  style={{ filter: 'drop-shadow(1px 1px 2px rgba(0,0,0,0.3))' }}
+                  data-testid="board-connection"
+                />
+              );
+            })}
+          </svg>
+        </Box>
       </Box>
+
+      {/* Zoom Controls - Fixed position in top-left */}
+      <Paper
+        elevation={2}
+        sx={{
+          position: 'absolute',
+          top: 90,
+          right: 16,
+          zIndex: 1100,
+          p: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1,
+          bgcolor: 'background.paper',
+        }}
+      >
+        <IconButton
+          size="small"
+          onClick={zoomIn}
+          title="Zoom In (Ctrl/Cmd + + or Ctrl/Cmd + Mouse Wheel)"
+          sx={{ fontSize: '0.8rem' }}
+        >
+          <ZoomInIcon fontSize="small" />
+        </IconButton>
+        <Typography variant="caption" align="center" sx={{ px: 0.5, minWidth: '40px' }}>
+          {Math.round(zoom * 100)}%
+        </Typography>
+        <IconButton
+          size="small"
+          onClick={zoomOut}
+          title="Zoom Out (Ctrl/Cmd + - or Ctrl/Cmd + Mouse Wheel)"
+          sx={{ fontSize: '0.8rem' }}
+        >
+          <ZoomOutIcon fontSize="small" />
+        </IconButton>
+        <IconButton
+          size="small"
+          onClick={resetZoom}
+          title="Reset Zoom (Ctrl/Cmd + 0)"
+          sx={{ fontSize: '0.8rem' }}
+        >
+          <ResetZoomIcon fontSize="small" />
+        </IconButton>
+      </Paper>
 
       {/* Floating Action Buttons */}
       {canEdit && (
@@ -517,6 +753,20 @@ const BoardPage: React.FC = () => {
             sx={{ bgcolor: isConnecting ? 'error.main' : 'primary.main' }}
             data-testid="connect-mode-button"
           />
+          <SpeedDialAction
+            icon={<DeleteIcon />}
+            tooltipTitle={`Delete Selected (${selectedItems.size} items)`}
+            onClick={selectedItems.size > 0 ? handleDeleteSelected : undefined}
+            sx={{ 
+              bgcolor: selectedItems.size > 0 ? 'error.main' : 'action.disabled',
+              '&:hover': {
+                bgcolor: selectedItems.size > 0 ? 'error.dark' : 'action.disabled'
+              },
+              opacity: selectedItems.size > 0 ? 1 : 0.5,
+              pointerEvents: selectedItems.size > 0 ? 'auto' : 'none'
+            }}
+            data-testid="delete-selected-button"
+          />
         </SpeedDial>
       )}
     </Box>
@@ -541,7 +791,7 @@ interface BoardItemComponentProps {
   isConnecting: boolean;
   canEdit: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
-  onClick: () => void;
+  onClick: (isEditableClick?: boolean) => void;
   onUpdateContent: (content: string) => void;
 }
 
@@ -568,6 +818,11 @@ const BoardItemComponent: React.FC<BoardItemComponentProps> = ({
     onUpdateContent(trimmed);
   }, [draft, onUpdateContent]);
 
+  const handleClick = React.useCallback((e: React.MouseEvent, isEditableClick = false) => {
+    e.stopPropagation();
+    onClick(isEditableClick);
+  }, [onClick]);
+
   return (
     <Box
       sx={{
@@ -582,21 +837,21 @@ const BoardItemComponent: React.FC<BoardItemComponentProps> = ({
         bgcolor: isPostIt ? (item.color || '#ffeb3b') : (item.color || '#f5f5f5'),
         border: isPostIt ? 'none' : '1px solid #ddd',
         borderRadius: isPostIt ? '2px' : '4px',
-        boxShadow: isPostIt 
-          ? '0 4px 8px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(0,0,0,0.1)'
-          : '0 6px 12px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(0,0,0,0.1)',
+        boxShadow: isSelected
+          ? (isPostIt 
+              ? '0 4px 8px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(0,0,0,0.1), 0 0 0 3px rgba(25,118,210,0.3)'
+              : '0 6px 12px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(0,0,0,0.1), 0 0 0 3px rgba(25,118,210,0.3)')
+          : (isPostIt 
+              ? '0 4px 8px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(0,0,0,0.1)'
+              : '0 6px 12px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(0,0,0,0.1)'),
         p: isPostIt ? '20px 15px 15px 15px' : 2,
-        outline: isSelected ? '2px solid #1976d2' : 'none',
         '&:hover': canEdit ? {
           transform: `rotate(${item.rotation}deg) scale(1.02)`,
           zIndex: 100,
         } : {},
       }}
       onMouseDown={canEdit ? onMouseDown : undefined}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
+      onClick={(e) => handleClick(e, false)}
       data-testid="board-item"
       onDoubleClick={() => {
         if (!canEdit) return;
@@ -733,7 +988,13 @@ const BoardItemComponent: React.FC<BoardItemComponentProps> = ({
                 onUpdateContent(format(suspect));
               };
 
-              if (!canEdit) {
+              const handleFieldClick = (e: React.MouseEvent) => {
+                if (isEditing) {
+                  handleClick(e, true); // Mark as editable click to prevent selection
+                }
+              };
+
+              if (!canEdit || !isEditing) {
                 return (
                   <>
                     <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
@@ -767,6 +1028,7 @@ const BoardItemComponent: React.FC<BoardItemComponentProps> = ({
                       '&.Mui-focused .MuiInputBase-input::placeholder': { opacity: 0 }
                     }}
                     onMouseDown={stopDrag}
+                    onClick={handleFieldClick}
                     placeholder="Suspect Name"
                     inputProps={{ 'data-testid': 'suspect-name-input' }}
                   />
@@ -784,6 +1046,7 @@ const BoardItemComponent: React.FC<BoardItemComponentProps> = ({
                         '&.Mui-focused .MuiInputBase-input::placeholder': { opacity: 0 }
                       }}
                       onMouseDown={stopDrag}
+                      onClick={handleFieldClick}
                       placeholder="Unknown"
                       inputProps={{ 'data-testid': 'suspect-age-input' }}
                     />
@@ -796,6 +1059,7 @@ const BoardItemComponent: React.FC<BoardItemComponentProps> = ({
                       size="small"
                       fullWidth
                       onMouseDown={stopDrag}
+                      onClick={handleFieldClick}
                       sx={{
                         '& .MuiInputBase-input::placeholder': { opacity: 1 },
                         '&.Mui-focused .MuiInputBase-input::placeholder': { opacity: 0 }
@@ -816,6 +1080,7 @@ const BoardItemComponent: React.FC<BoardItemComponentProps> = ({
                     minRows={3}
                     maxRows={6}
                     onMouseDown={stopDrag}
+                    onClick={handleFieldClick}
                     sx={{
                       '& .MuiInputBase-input::placeholder': { opacity: 1 },
                       '&.Mui-focused .MuiInputBase-input::placeholder': { opacity: 0 }
