@@ -87,7 +87,7 @@ const boardsApiInstance = createApiInstance(
 export const authApi = {
   login: async (data: LoginRequest): Promise<AuthResponse> => {
     const response: AxiosResponse<AuthResponse> = await authApiInstance.post(
-      '/api/v1/auth/login',
+      '/v1/auth/login',
       data
     );
     return response.data;
@@ -95,7 +95,7 @@ export const authApi = {
 
   register: async (data: RegisterRequest): Promise<AuthResponse> => {
     const response: AxiosResponse<AuthResponse> = await authApiInstance.post(
-      '/api/v1/auth/register',
+      '/v1/auth/register',
       data
     );
     return response.data;
@@ -103,28 +103,28 @@ export const authApi = {
 
   refreshToken: async (token: string): Promise<AuthResponse> => {
     const response: AxiosResponse<AuthResponse> = await authApiInstance.post(
-      '/api/v1/auth/refresh',
+      '/v1/auth/refresh',
       { token }
     );
     return response.data;
   },
 
   getProfile: async (): Promise<User> => {
-    const response: AxiosResponse<User> = await authApiInstance.get('/api/v1/me');
+    const response: AxiosResponse<User> = await authApiInstance.get('/v1/me');
     return response.data;
   },
 
   updateProfile: async (data: Partial<User>): Promise<User> => {
-    const response: AxiosResponse<User> = await authApiInstance.put('/api/v1/me', data);
+    const response: AxiosResponse<User> = await authApiInstance.put('/v1/me', data);
     return response.data;
   },
 
   logout: async (): Promise<void> => {
-    await authApiInstance.post('/api/v1/logout');
+    await authApiInstance.post('/v1/logout');
   },
 
   getGoogleLoginUrl: async (): Promise<{ url: string; state: string }> => {
-    const response = await authApiInstance.get('/api/v1/auth/google');
+    const response = await authApiInstance.get('/v1/auth/google');
     return response.data;
   },
 };
@@ -134,7 +134,7 @@ export const boardsApi = {
   // Board CRUD
   getBoards: async (page = 1, limit = 20): Promise<PaginatedResponse<Board>> => {
     const response: AxiosResponse<any> = await boardsApiInstance.get(
-      `/api/v1/boards?page=${page}&limit=${limit}`
+      `/v1/boards?page=${page}&limit=${limit}`
     );
     const data = response.data;
     // Normalize backend response { boards, total, page, limit } -> { data, total, page, limit, has_more }
@@ -157,41 +157,41 @@ export const boardsApi = {
   },
 
   getBoard: async (id: string): Promise<Board> => {
-    const response: AxiosResponse<Board> = await boardsApiInstance.get(`/api/v1/boards/${id}`);
+    const response: AxiosResponse<Board> = await boardsApiInstance.get(`/v1/boards/${id}`);
     return response.data;
   },
 
   getPublicBoard: async (id: string): Promise<Board> => {
     const response: AxiosResponse<Board> = await boardsApiInstance.get(
-      `/api/v1/public/boards/${id}`
+      `/v1/public/boards/${id}`
     );
     return response.data;
   },
 
   createBoard: async (data: CreateBoardRequest): Promise<Board> => {
-    const response: AxiosResponse<Board> = await boardsApiInstance.post('/api/v1/boards', data);
+    const response: AxiosResponse<Board> = await boardsApiInstance.post('/v1/boards', data);
     return response.data;
   },
 
   updateBoard: async (id: string, data: UpdateBoardRequest): Promise<Board> => {
     const response: AxiosResponse<Board> = await boardsApiInstance.put(
-      `/api/v1/boards/${id}`,
+      `/v1/boards/${id}`,
       data
     );
     return response.data;
   },
 
   deleteBoard: async (id: string): Promise<void> => {
-    await boardsApiInstance.delete(`/api/v1/boards/${id}`);
+    await boardsApiInstance.delete(`/v1/boards/${id}`);
   },
 
   // Board sharing
   shareBoard: async (id: string, data: ShareBoardRequest): Promise<void> => {
-    await boardsApiInstance.post(`/api/v1/boards/${id}/share`, data);
+    await boardsApiInstance.post(`/v1/boards/${id}/share`, data);
   },
 
   unshareBoard: async (boardId: string, userId: string): Promise<void> => {
-    await boardsApiInstance.delete(`/api/v1/boards/${boardId}/share/${userId}`);
+    await boardsApiInstance.delete(`/v1/boards/${boardId}/share/${userId}`);
   },
 
   updateUserPermission: async (
@@ -199,7 +199,7 @@ export const boardsApi = {
     userId: string,
     permission: string
   ): Promise<void> => {
-    await boardsApiInstance.put(`/api/v1/boards/${boardId}/users/${userId}/permission`, {
+    await boardsApiInstance.put(`/v1/boards/${boardId}/users/${userId}/permission`, {
       permission,
     });
   },
@@ -207,14 +207,14 @@ export const boardsApi = {
   // Board items
   getBoardItems: async (boardId: string): Promise<BoardItem[]> => {
     const response: AxiosResponse<BoardItem[]> = await boardsApiInstance.get(
-      `/api/v1/boards/${boardId}/items`
+      `/v1/boards/${boardId}/items`
     );
     return response.data;
   },
 
   createBoardItem: async (boardId: string, data: CreateBoardItemRequest): Promise<BoardItem> => {
     const response: AxiosResponse<BoardItem> = await boardsApiInstance.post(
-      `/api/v1/boards/${boardId}/items`,
+      `/v1/boards/${boardId}/items`,
       data
     );
     return response.data;
@@ -226,20 +226,20 @@ export const boardsApi = {
     data: UpdateBoardItemRequest
   ): Promise<BoardItem> => {
     const response: AxiosResponse<BoardItem> = await boardsApiInstance.put(
-      `/api/v1/boards/${boardId}/items/${itemId}`,
+      `/v1/boards/${boardId}/items/${itemId}`,
       data
     );
     return response.data;
   },
 
   deleteBoardItem: async (boardId: string, itemId: string): Promise<void> => {
-    await boardsApiInstance.delete(`/api/v1/boards/${boardId}/items/${itemId}`);
+    await boardsApiInstance.delete(`/v1/boards/${boardId}/items/${itemId}`);
   },
 
   // Board connections
   getBoardConnections: async (boardId: string): Promise<BoardConnection[]> => {
     const response: AxiosResponse<BoardConnection[]> = await boardsApiInstance.get(
-      `/api/v1/boards/${boardId}/connections`
+      `/v1/boards/${boardId}/connections`
     );
     return response.data;
   },
@@ -249,7 +249,7 @@ export const boardsApi = {
     data: CreateBoardConnectionRequest
   ): Promise<BoardConnection> => {
     const response: AxiosResponse<BoardConnection> = await boardsApiInstance.post(
-      `/api/v1/boards/${boardId}/connections`,
+      `/v1/boards/${boardId}/connections`,
       data
     );
     return response.data;
@@ -261,14 +261,14 @@ export const boardsApi = {
     data: any
   ): Promise<BoardConnection> => {
     const response: AxiosResponse<BoardConnection> = await boardsApiInstance.put(
-      `/api/v1/boards/${boardId}/connections/${connectionId}`,
+      `/v1/boards/${boardId}/connections/${connectionId}`,
       data
     );
     return response.data;
   },
 
   deleteBoardConnection: async (boardId: string, connectionId: string): Promise<void> => {
-    await boardsApiInstance.delete(`/api/v1/boards/${boardId}/connections/${connectionId}`);
+    await boardsApiInstance.delete(`/v1/boards/${boardId}/connections/${connectionId}`);
   },
 };
 

@@ -195,8 +195,8 @@ const BoardPage: React.FC = () => {
       type: 'suspect-card' as const,
       x: position.x,
       y: position.y,
-      width: 250,
-      height: 300,
+      width: 280,
+      height: 450,
       rotation: 0,
       z_index: items.length + 1,
       content: 'Suspect Name\nAge: Unknown\nLast seen:\nNotes:',
@@ -814,6 +814,7 @@ const BoardItemComponent: React.FC<BoardItemComponentProps> = ({
                     fullWidth
                     multiline
                     minRows={3}
+                    maxRows={6}
                     onMouseDown={stopDrag}
                     sx={{
                       '& .MuiInputBase-input::placeholder': { opacity: 1 },

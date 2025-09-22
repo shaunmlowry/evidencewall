@@ -26,6 +26,8 @@ services:
       - "80:80"
     depends_on:
       - frontend
+      - auth-service
+      - boards-service
       - realtime-service
     networks:
       - default
