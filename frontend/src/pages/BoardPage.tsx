@@ -242,7 +242,7 @@ const BoardPage: React.FC = () => {
       x: position.x,
       y: position.y,
       width: 280,
-      height: 520,
+      height: 360,
       rotation: 0,
       z_index: items.length + 1,
       content: 'Suspect Name\nAge: Unknown\nLast seen:\nNotes:',
@@ -880,47 +880,47 @@ const BoardItemComponent: React.FC<BoardItemComponentProps> = ({
       />
 
       {/* Content */}
-      {isEditing ? (
-        <TextField
-          fullWidth
-          multiline
-          size="small"
-          variant="outlined"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.shiftKey || isPostIt)) {
-              if (!e.shiftKey) {
+      {isPostIt ? (
+        isEditing ? (
+          <TextField
+            fullWidth
+            multiline
+            size="small"
+            variant="outlined"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.shiftKey || isPostIt)) {
+                if (!e.shiftKey) {
+                  e.preventDefault();
+                  commit();
+                }
+              } else if (e.key === 'Enter' && !isPostIt) {
                 e.preventDefault();
                 commit();
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                setIsEditing(false);
+                setDraft(item.content || '');
               }
-            } else if (e.key === 'Enter' && !isPostIt) {
-              e.preventDefault();
-              commit();
-            } else if (e.key === 'Escape') {
-              e.preventDefault();
-              setIsEditing(false);
-              setDraft(item.content || '');
-            }
-          }}
-          autoFocus
-          inputProps={{ 'data-testid': 'item-edit-input' }}
-          placeholder={isPostIt ? '' : undefined}
-          sx={{
-            '& .MuiInputBase-input': {
-              fontFamily: isPostIt ? '"Courier New", monospace' : undefined,
-              fontSize: isPostIt ? 14 : undefined,
-              lineHeight: isPostIt ? 1.4 : undefined,
-              color: '#333',
-              whiteSpace: 'pre-wrap',
-              padding: isPostIt ? 0 : undefined,
-            },
-            backgroundColor: 'rgba(255,255,255,0.9)'
-          }}
-        />
-      ) : (
-        isPostIt ? (
+            }}
+            autoFocus
+            inputProps={{ 'data-testid': 'item-edit-input' }}
+            placeholder={isPostIt ? '' : undefined}
+            sx={{
+              '& .MuiInputBase-input': {
+                fontFamily: '"Courier New", monospace',
+                fontSize: 14,
+                lineHeight: 1.4,
+                color: '#333',
+                whiteSpace: 'pre-wrap',
+                padding: 0,
+              },
+              backgroundColor: 'rgba(255,255,255,0.9)'
+            }}
+          />
+        ) : (
           <Typography
             variant="body2"
             sx={{
@@ -934,13 +934,14 @@ const BoardItemComponent: React.FC<BoardItemComponentProps> = ({
           >
             {item.content || 'Evidence notes...'}
           </Typography>
-        ) : (
+        )
+      ) : (
           <Box>
             {/* Suspect card photo area */}
             <Box
               sx={{
                 width: '100%',
-                height: 120,
+                height: 100,
                 bgcolor: '#e0e0e0',
                 borderBottom: '1px solid #ddd',
                 display: 'flex',
@@ -954,158 +955,180 @@ const BoardItemComponent: React.FC<BoardItemComponentProps> = ({
               👤
             </Box>
 
-            {(() => {
-              // Helpers to parse/format the suspect card content
-              const parse = (content: string) => {
-                const lines = (content || '').split('\n');
-                const name = (lines[0] || '').trim();
-                const ageLine = lines.find((l) => l.trim().toLowerCase().startsWith('age:')) || 'Age:';
-                const lastSeenLine = lines.find((l) => l.trim().toLowerCase().startsWith('last seen:')) || 'Last seen:';
-                const notesIndex = lines.findIndex((l) => l.trim().toLowerCase().startsWith('notes:'));
-                const age = ageLine.split(':').slice(1).join(':').trim();
-                const lastSeen = lastSeenLine.split(':').slice(1).join(':').trim();
-                const notes = notesIndex >= 0 ? lines.slice(notesIndex + 1).join('\n') : '';
-                return { name, age, lastSeen, notes };
-              };
-              const format = (s: { name: string; age: string; lastSeen: string; notes: string }) => {
-                const header = `${s.name || ''}`;
-                const ageL = `Age: ${s.age || ''}`;
-                const lastL = `Last seen: ${s.lastSeen || ''}`;
-                const notesHeader = 'Notes:';
-                const notesBody = (s.notes || '').length ? `\n${s.notes}` : '';
-                return `${header}\n${ageL}\n${lastL}\n${notesHeader}${notesBody}`;
-              };
-
-              const stopDrag = (e: React.MouseEvent) => e.stopPropagation();
-              const initial = parse(item.content || '');
-              const [suspect, setSuspect] = React.useState(initial);
-              const [suspectIsEditing, setSuspectIsEditing] = React.useState(false);
-
-              React.useEffect(() => {
-                setSuspect(parse(item.content || ''));
-              }, [item.content]);
-
-              // Sync with parent editing state when double-clicked
-              React.useEffect(() => {
-                setSuspectIsEditing(isEditing);
-              }, [isEditing]);
-
-              const commitSuspect = () => {
-                onUpdateContent(format(suspect));
-                setSuspectIsEditing(false);
-                setIsEditing(false); // Also sync parent state
-              };
-
-              const handleFieldClick = (e: React.MouseEvent) => {
-                if (suspectIsEditing) {
-                  handleClick(e, true); // Mark as editable click to prevent selection
-                }
-              };
-
-              if (!canEdit || !suspectIsEditing) {
-                return (
-                  <>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
-                      {suspect.name || 'Suspect Name'}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary" sx={{ whiteSpace: 'pre-wrap' }}>
-                      {`Age: ${suspect.age || 'Unknown'}\nLast seen: ${suspect.lastSeen || ''}\nNotes:`}
-                    </Typography>
-                    {suspect.notes && (
-                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mt: 1 }}>
-                        {suspect.notes}
-                      </Typography>
-                    )}
-                  </>
-                );
-              }
-
-              return (
-                <Box>
-                  <TextField
-                    label="Name"
-                    value={suspect.name}
-                    onChange={(e) => setSuspect((s) => ({ ...s, name: e.target.value }))}
-                    onBlur={commitSuspect}
-                    variant="outlined"
-                    size="small"
-                    fullWidth
-                    sx={{
-                      mb: 1,
-                      '& .MuiInputBase-input::placeholder': { opacity: 1 },
-                      '&.Mui-focused .MuiInputBase-input::placeholder': { opacity: 0 }
-                    }}
-                    onMouseDown={stopDrag}
-                    onClick={handleFieldClick}
-                    placeholder="Suspect Name"
-                    inputProps={{ 'data-testid': 'suspect-name-input' }}
-                  />
-                  <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-                    <TextField
-                      label="Age"
-                      value={suspect.age}
-                      onChange={(e) => setSuspect((s) => ({ ...s, age: e.target.value }))}
-                      onBlur={commitSuspect}
-                      variant="outlined"
-                      size="small"
-                      sx={{
-                        width: 140,
-                        '& .MuiInputBase-input::placeholder': { opacity: 1 },
-                        '&.Mui-focused .MuiInputBase-input::placeholder': { opacity: 0 }
-                      }}
-                      onMouseDown={stopDrag}
-                      onClick={handleFieldClick}
-                      placeholder="Unknown"
-                      inputProps={{ 'data-testid': 'suspect-age-input' }}
-                    />
-                    <TextField
-                      label="Last seen"
-                      value={suspect.lastSeen}
-                      onChange={(e) => setSuspect((s) => ({ ...s, lastSeen: e.target.value }))}
-                      onBlur={commitSuspect}
-                      variant="outlined"
-                      size="small"
-                      fullWidth
-                      onMouseDown={stopDrag}
-                      onClick={handleFieldClick}
-                      sx={{
-                        '& .MuiInputBase-input::placeholder': { opacity: 1 },
-                        '&.Mui-focused .MuiInputBase-input::placeholder': { opacity: 0 }
-                      }}
-                      placeholder="Location / time"
-                      inputProps={{ 'data-testid': 'suspect-lastseen-input' }}
-                    />
-                  </Box>
-                  <TextField
-                    label="Notes"
-                    value={suspect.notes}
-                    onChange={(e) => setSuspect((s) => ({ ...s, notes: e.target.value }))}
-                    onBlur={commitSuspect}
-                    variant="outlined"
-                    size="small"
-                    fullWidth
-                    multiline
-                    minRows={3}
-                    maxRows={6}
-                    onMouseDown={stopDrag}
-                    onClick={handleFieldClick}
-                    sx={{
-                      '& .MuiInputBase-input::placeholder': { opacity: 1 },
-                      '&.Mui-focused .MuiInputBase-input::placeholder': { opacity: 0 }
-                    }}
-                    placeholder="Add notes..."
-                    inputProps={{ 'data-testid': 'suspect-notes-input' }}
-                  />
-                </Box>
-              );
-            })()}
+            <SuspectCardContent
+              content={item.content}
+              canEdit={canEdit}
+              isParentEditing={isEditing}
+              onRequestSetParentEditing={setIsEditing}
+              onUpdateContent={onUpdateContent}
+              onEditableClick={(e) => handleClick(e, true)}
+            />
           </Box>
-        )
       )}
     </Box>
   );
 };
 
 export default BoardPage;
+
+// Child component to render and edit suspect card content without violating hook rules
+interface SuspectCardContentProps {
+  content: string;
+  canEdit: boolean;
+  isParentEditing: boolean;
+  onRequestSetParentEditing: (editing: boolean) => void;
+  onUpdateContent: (content: string) => void;
+  onEditableClick: (e: React.MouseEvent) => void;
+}
+
+const SuspectCardContent: React.FC<SuspectCardContentProps> = ({
+  content,
+  canEdit,
+  isParentEditing,
+  onRequestSetParentEditing,
+  onUpdateContent,
+  onEditableClick,
+}) => {
+  const parse = (raw: string) => {
+    const lines = (raw || '').split('\n');
+    const name = (lines[0] || '').trim();
+    const ageLine = lines.find((l) => l.trim().toLowerCase().startsWith('age:')) || 'Age:';
+    const lastSeenLine = lines.find((l) => l.trim().toLowerCase().startsWith('last seen:')) || 'Last seen:';
+    const notesIndex = lines.findIndex((l) => l.trim().toLowerCase().startsWith('notes:'));
+    const age = ageLine.split(':').slice(1).join(':').trim();
+    const lastSeen = lastSeenLine.split(':').slice(1).join(':').trim();
+    const notes = notesIndex >= 0 ? lines.slice(notesIndex + 1).join('\n') : '';
+    return { name, age, lastSeen, notes };
+  };
+  const format = (s: { name: string; age: string; lastSeen: string; notes: string }) => {
+    const header = `${s.name || ''}`;
+    const ageL = `Age: ${s.age || ''}`;
+    const lastL = `Last seen: ${s.lastSeen || ''}`;
+    const notesHeader = 'Notes:';
+    const notesBody = (s.notes || '').length ? `\n${s.notes}` : '';
+    return `${header}\n${ageL}\n${lastL}\n${notesHeader}${notesBody}`;
+  };
+
+  const stopDrag = (e: React.MouseEvent) => e.stopPropagation();
+  const [suspect, setSuspect] = React.useState(parse(content || ''));
+  const [suspectIsEditing, setSuspectIsEditing] = React.useState(false);
+
+  React.useEffect(() => {
+    setSuspect(parse(content || ''));
+  }, [content]);
+
+  React.useEffect(() => {
+    setSuspectIsEditing(isParentEditing);
+  }, [isParentEditing]);
+
+  const commitSuspect = () => {
+    onUpdateContent(format(suspect));
+    setSuspectIsEditing(false);
+    onRequestSetParentEditing(false);
+  };
+
+  const handleFieldClick = (e: React.MouseEvent) => {
+    if (suspectIsEditing) {
+      onEditableClick(e);
+    }
+  };
+
+  if (!canEdit || !suspectIsEditing) {
+    return (
+      <>
+        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
+          {suspect.name || 'Suspect Name'}
+        </Typography>
+        <Typography variant="body2" color="textSecondary" sx={{ whiteSpace: 'pre-wrap' }}>
+          {`Age: ${suspect.age || 'Unknown'}\nLast seen: ${suspect.lastSeen || ''}\nNotes:`}
+        </Typography>
+        {suspect.notes && (
+          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mt: 1 }}>
+            {suspect.notes}
+          </Typography>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <Box>
+      <TextField
+        label="Name"
+        value={suspect.name}
+        onChange={(e) => setSuspect((s) => ({ ...s, name: e.target.value }))}
+        onBlur={commitSuspect}
+        variant="outlined"
+        size="small"
+        fullWidth
+        sx={{
+          mb: 1,
+          '& .MuiInputBase-input::placeholder': { opacity: 1 },
+          '&.Mui-focused .MuiInputBase-input::placeholder': { opacity: 0 }
+        }}
+        onMouseDown={stopDrag}
+        onClick={handleFieldClick}
+        placeholder="Suspect Name"
+        inputProps={{ 'data-testid': 'suspect-name-input' }}
+      />
+      <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+        <TextField
+          label="Age"
+          value={suspect.age}
+          onChange={(e) => setSuspect((s) => ({ ...s, age: e.target.value }))}
+          onBlur={commitSuspect}
+          variant="outlined"
+          size="small"
+          sx={{
+            width: 140,
+            '& .MuiInputBase-input::placeholder': { opacity: 1 },
+            '&.Mui-focused .MuiInputBase-input::placeholder': { opacity: 0 }
+          }}
+          onMouseDown={stopDrag}
+          onClick={handleFieldClick}
+          placeholder="Unknown"
+          inputProps={{ 'data-testid': 'suspect-age-input' }}
+        />
+        <TextField
+          label="Last seen"
+          value={suspect.lastSeen}
+          onChange={(e) => setSuspect((s) => ({ ...s, lastSeen: e.target.value }))}
+          onBlur={commitSuspect}
+          variant="outlined"
+          size="small"
+          fullWidth
+          onMouseDown={stopDrag}
+          onClick={handleFieldClick}
+          sx={{
+            '& .MuiInputBase-input::placeholder': { opacity: 1 },
+            '&.Mui-focused .MuiInputBase-input::placeholder': { opacity: 0 }
+          }}
+          placeholder="Location / time"
+          inputProps={{ 'data-testid': 'suspect-lastseen-input' }}
+        />
+      </Box>
+      <TextField
+        label="Notes"
+        value={suspect.notes}
+        onChange={(e) => setSuspect((s) => ({ ...s, notes: e.target.value }))}
+        onBlur={commitSuspect}
+        variant="outlined"
+        size="small"
+        fullWidth
+        multiline
+        minRows={3}
+        maxRows={6}
+        onMouseDown={stopDrag}
+        onClick={handleFieldClick}
+        sx={{
+          '& .MuiInputBase-input::placeholder': { opacity: 1 },
+          '&.Mui-focused .MuiInputBase-input::placeholder': { opacity: 0 }
+        }}
+        placeholder="Add notes..."
+        inputProps={{ 'data-testid': 'suspect-notes-input' }}
+      />
+    </Box>
+  );
+};
 
 

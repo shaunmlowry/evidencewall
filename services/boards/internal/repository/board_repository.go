@@ -132,9 +132,9 @@ func (r *BoardRepository) Update(board *models.Board) error {
 	return r.db.Save(board).Error
 }
 
-// Delete soft deletes a board
+// Delete permanently deletes a board
 func (r *BoardRepository) Delete(id uuid.UUID) error {
-	return r.db.Where("id = ?", id).Delete(&models.Board{}).Error
+	return r.db.Unscoped().Where("id = ?", id).Delete(&models.Board{}).Error
 }
 
 // BoardUserRepository handles board user relationships

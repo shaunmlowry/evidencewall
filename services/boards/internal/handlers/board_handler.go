@@ -595,7 +595,8 @@ func (h *BoardHandler) DeleteBoardItem(c *gin.Context) {
 		return
 	}
 
-	boardID, err := uuid.Parse(c.Param("boardId"))
+    // Router uses :id for board identifier (see routes setup)
+    boardID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid board ID"})
 		return

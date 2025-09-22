@@ -314,15 +314,32 @@ func (s *BoardService) CreateBoardItem(boardID, userID uuid.UUID, req CreateItem
 		return nil, ErrUnauthorized
 	}
 
-	// Convert metadata to JSON
+    // Convert metadata to JSON
 	var metadataJSON []byte
 	if req.Metadata != nil {
 		metadataJSON, _ = json.Marshal(req.Metadata)
 	}
 
+    // Determine persisted item type to satisfy DB constraints.
+    // Frontend may send req.Type = "note" and specify UI variant in metadata.variant.
+    // Map to DB types: 'post-it' | 'suspect-card'. Default to 'post-it'.
+    persistedType := models.ItemType("post-it")
+    if req.Metadata != nil {
+        if v, ok := req.Metadata["variant"]; ok {
+            if vs, ok := v.(string); ok {
+                switch vs {
+                case "suspect-card":
+                    persistedType = models.ItemType("suspect-card")
+                case "post-it":
+                    persistedType = models.ItemType("post-it")
+                }
+            }
+        }
+    }
+
 	item := &models.BoardItem{
 		BoardID:   boardID,
-		Type:      req.Type,
+        Type:      persistedType,
 		Content:   req.Content,
 		X:         req.X,
 		Y:         req.Y,

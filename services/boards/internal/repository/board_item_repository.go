@@ -48,14 +48,14 @@ func (r *BoardItemRepository) Update(item *models.BoardItem) error {
 	return r.db.Save(item).Error
 }
 
-// Delete soft deletes a board item
+// Delete permanently deletes a board item
 func (r *BoardItemRepository) Delete(id uuid.UUID) error {
-	return r.db.Where("id = ?", id).Delete(&models.BoardItem{}).Error
+	return r.db.Unscoped().Where("id = ?", id).Delete(&models.BoardItem{}).Error
 }
 
-// DeleteByBoard deletes all items for a board
+// DeleteByBoard permanently deletes all items for a board
 func (r *BoardItemRepository) DeleteByBoard(boardID uuid.UUID) error {
-	return r.db.Where("board_id = ?", boardID).Delete(&models.BoardItem{}).Error
+	return r.db.Unscoped().Where("board_id = ?", boardID).Delete(&models.BoardItem{}).Error
 }
 
 // BoardConnectionRepository handles board connection data operations
@@ -98,19 +98,19 @@ func (r *BoardConnectionRepository) Update(connection *models.BoardConnection) e
 	return r.db.Save(connection).Error
 }
 
-// Delete soft deletes a board connection
+// Delete permanently deletes a board connection
 func (r *BoardConnectionRepository) Delete(id uuid.UUID) error {
-	return r.db.Where("id = ?", id).Delete(&models.BoardConnection{}).Error
+	return r.db.Unscoped().Where("id = ?", id).Delete(&models.BoardConnection{}).Error
 }
 
-// DeleteByBoard deletes all connections for a board
+// DeleteByBoard permanently deletes all connections for a board
 func (r *BoardConnectionRepository) DeleteByBoard(boardID uuid.UUID) error {
-	return r.db.Where("board_id = ?", boardID).Delete(&models.BoardConnection{}).Error
+	return r.db.Unscoped().Where("board_id = ?", boardID).Delete(&models.BoardConnection{}).Error
 }
 
-// DeleteByItem deletes all connections for a specific item
+// DeleteByItem permanently deletes all connections for a specific item
 func (r *BoardConnectionRepository) DeleteByItem(itemID uuid.UUID) error {
-	return r.db.Where("from_item_id = ? OR to_item_id = ?", itemID, itemID).Delete(&models.BoardConnection{}).Error
+	return r.db.Unscoped().Where("from_item_id = ? OR to_item_id = ?", itemID, itemID).Delete(&models.BoardConnection{}).Error
 }
 
 
