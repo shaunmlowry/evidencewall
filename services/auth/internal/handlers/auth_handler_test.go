@@ -609,6 +609,13 @@ func TestAuthHandler_GoogleCallback(t *testing.T) {
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
+			name:           "missing state parameter",
+			code:           "valid-auth-code",
+			mockResponse:   nil,
+			mockError:      nil,
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
 			name:           "Google authentication failed",
 			code:           "invalid-code",
 			mockResponse:   nil,
@@ -633,6 +640,10 @@ func TestAuthHandler_GoogleCallback(t *testing.T) {
 			if tt.code != "" {
 				q := req.URL.Query()
 				q.Add("code", tt.code)
+				// Add state parameter for CSRF protection (except for missing state test)
+				if tt.name != "missing state parameter" {
+					q.Add("state", "test-state")
+				}
 				req.URL.RawQuery = q.Encode()
 			}
 
