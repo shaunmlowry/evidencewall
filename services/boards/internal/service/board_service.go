@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
+	"regexp"
+	"strings"
 
 	"evidence-wall/shared/models"
 
@@ -18,7 +21,52 @@ var (
 	ErrConnectionNotFound = errors.New("connection not found")
 	ErrUnauthorized       = errors.New("unauthorized")
 	ErrInvalidInput       = errors.New("invalid input")
+	ErrInputTooLong       = errors.New("input too long")
+	ErrInvalidCharacters  = errors.New("invalid characters in input")
 )
+
+// Input validation constants
+const (
+	MaxTitleLength    = 200
+	MaxContentLength  = 5000
+	MaxDescriptionLength = 1000
+	MaxNameLength     = 100
+)
+
+// HTML tag regex for sanitization
+var htmlTagRegex = regexp.MustCompile(`<[^>]*>`)
+
+// Input validation and sanitization functions
+func validateAndSanitizeString(input string, maxLength int, fieldName string) (string, error) {
+	if len(input) > maxLength {
+		return "", fmt.Errorf("%s: %w (max %d characters)", fieldName, ErrInputTooLong, maxLength)
+	}
+	
+	// Remove HTML tags and escape HTML entities
+	sanitized := htmlTagRegex.ReplaceAllString(input, "")
+	sanitized = html.EscapeString(sanitized)
+	
+	// Trim whitespace
+	sanitized = strings.TrimSpace(sanitized)
+	
+	return sanitized, nil
+}
+
+func validateTitle(title string) (string, error) {
+	return validateAndSanitizeString(title, MaxTitleLength, "title")
+}
+
+func validateContent(content string) (string, error) {
+	return validateAndSanitizeString(content, MaxContentLength, "content")
+}
+
+func validateDescription(description string) (string, error) {
+	return validateAndSanitizeString(description, MaxDescriptionLength, "description")
+}
+
+func validateName(name string) (string, error) {
+	return validateAndSanitizeString(name, MaxNameLength, "name")
+}
 
 // BoardService handles board business logic
 type BoardService struct {
@@ -62,9 +110,20 @@ type UpdateBoardRequest struct {
 
 // CreateBoard creates a new board
 func (s *BoardService) CreateBoard(userID uuid.UUID, req CreateBoardRequest) (*models.Board, error) {
+	// Validate and sanitize input
+	title, err := validateTitle(req.Title)
+	if err != nil {
+		return nil, fmt.Errorf("title validation failed: %w", err)
+	}
+	
+	description, err := validateDescription(req.Description)
+	if err != nil {
+		return nil, fmt.Errorf("description validation failed: %w", err)
+	}
+
 	board := &models.Board{
-		Title:       req.Title,
-		Description: req.Description,
+		Title:       title,
+		Description: description,
 		Visibility:  req.Visibility,
 		OwnerID:     userID,
 	}
@@ -313,6 +372,12 @@ func (s *BoardService) CreateBoardItem(boardID, userID uuid.UUID, req CreateItem
 		return nil, ErrUnauthorized
 	}
 
+	// Validate and sanitize content
+	content, err := validateContent(req.Content)
+	if err != nil {
+		return nil, fmt.Errorf("content validation failed: %w", err)
+	}
+
 	// Convert metadata to JSON
 	var metadataJSON []byte
 	if req.Metadata != nil {
@@ -339,7 +404,7 @@ func (s *BoardService) CreateBoardItem(boardID, userID uuid.UUID, req CreateItem
 	item := &models.BoardItem{
 		BoardID:   boardID,
 		Type:      persistedType,
-		Content:   req.Content,
+		Content:   content,
 		X:         req.X,
 		Y:         req.Y,
 		Width:     req.Width,
@@ -395,7 +460,11 @@ func (s *BoardService) UpdateBoardItem(boardID, itemID, userID uuid.UUID, req Up
 
 	// Update fields if provided
 	if req.Content != "" {
-		item.Content = req.Content
+		content, err := validateContent(req.Content)
+		if err != nil {
+			return nil, fmt.Errorf("content validation failed: %w", err)
+		}
+		item.Content = content
 	}
 	if req.X != nil {
 		item.X = *req.X

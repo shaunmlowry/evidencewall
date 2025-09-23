@@ -15,6 +15,7 @@ import {
     UpdateBoardRequest,
     User,
 } from '../types';
+import { getToken, removeToken } from '../utils/tokenStorage';
 
 // Create axios instance
 const createApiInstance = (baseURL: string): AxiosInstance => {
@@ -28,7 +29,7 @@ const createApiInstance = (baseURL: string): AxiosInstance => {
 
   // Add auth token to requests
   instance.interceptors.request.use((config) => {
-    const token = localStorage.getItem('auth_token');
+    const token = getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -64,7 +65,7 @@ const createApiInstance = (baseURL: string): AxiosInstance => {
         });
       }
       if (error.response?.status === 401) {
-        localStorage.removeItem('auth_token');
+        removeToken();
         window.location.href = '/login';
       }
       return Promise.reject(error);

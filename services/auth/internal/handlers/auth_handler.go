@@ -245,8 +245,16 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		return
 	}
 
-	// In a production app, you should validate the state parameter
-	// state := c.Query("state")
+	// Validate state parameter for CSRF protection
+	state := c.Query("state")
+	if state == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "State parameter required for CSRF protection"})
+		return
+	}
+
+	// In a production app, you should validate the state parameter against a stored value
+	// For now, we just ensure it's not empty
+	// TODO: Implement proper state validation with Redis/session storage
 
 	response, err := h.authService.GoogleCallback(code)
 	if err != nil {

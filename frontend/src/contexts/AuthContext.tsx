@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { User, AuthResponse } from '../types';
 import { authApi } from '../services/api';
+import { storeToken, getToken, removeToken, hasValidToken, getTokenExpiryFromPayload } from '../utils/tokenStorage';
 
 interface AuthState {
   user: User | null;
@@ -90,8 +91,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Check for existing token on mount
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
+    const token = getToken();
+    if (token && hasValidToken()) {
       // Verify token with server
       authApi.getProfile()
         .then((user) => {
@@ -101,7 +102,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           });
         })
         .catch(() => {
-          localStorage.removeItem('auth_token');
+          removeToken();
           dispatch({ type: 'AUTH_FAILURE' });
         });
     } else {
@@ -113,7 +114,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     dispatch({ type: 'AUTH_START' });
     try {
       const response = await authApi.login({ email, password });
-      localStorage.setItem('auth_token', response.token);
+      const expiryTime = getTokenExpiryFromPayload(response.token);
+      storeToken(response.token, expiryTime || undefined);
       dispatch({ type: 'AUTH_SUCCESS', payload: response });
     } catch (error) {
       dispatch({ type: 'AUTH_FAILURE' });
@@ -125,7 +127,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     dispatch({ type: 'AUTH_START' });
     try {
       const response = await authApi.register({ email, name, password });
-      localStorage.setItem('auth_token', response.token);
+      const expiryTime = getTokenExpiryFromPayload(response.token);
+      storeToken(response.token, expiryTime || undefined);
       dispatch({ type: 'AUTH_SUCCESS', payload: response });
     } catch (error) {
       dispatch({ type: 'AUTH_FAILURE' });
@@ -134,7 +137,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('auth_token');
+    removeToken();
     dispatch({ type: 'LOGOUT' });
   };
 
