@@ -515,14 +515,12 @@ const BoardPage: React.FC = () => {
   }, [panX, panY]);
 
   const onCanvasWheel = useCallback((e: React.WheelEvent) => {
-    if (e.ctrlKey || e.metaKey) {
-      // Only zoom when Ctrl/Cmd is held down - prevent all scrolling
-      e.preventDefault();
-      e.stopPropagation();
-      const delta = e.deltaY > 0 ? -0.01 : 0.01; // 1% zoom increments
-      setZoom(prev => Math.max(0.1, Math.min(3.0, prev + delta)));
+    // Zoom is now handled by the global wheel handler
+    // This handler can be used for other canvas-specific wheel behaviors if needed
+    if (!e.ctrlKey && !e.metaKey) {
+      // Allow normal scrolling when Ctrl/Cmd is not pressed
+      // (though the canvas typically doesn't scroll)
     }
-    // Otherwise allow normal scrolling
   }, []);
 
   // Keyboard shortcuts and global wheel handler
@@ -558,9 +556,17 @@ const BoardPage: React.FC = () => {
 
     const handleGlobalWheel = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
-        // Prevent any scrolling when Ctrl/Cmd is pressed
+        // Always prevent the default browser zoom behavior
         e.preventDefault();
         e.stopPropagation();
+        
+        // Apply custom board zoom if mouse is over the board canvas
+        const target = e.target as HTMLElement;
+        if (canvasRef.current && canvasRef.current.contains(target)) {
+          const delta = e.deltaY > 0 ? -0.01 : 0.01; // 1% zoom increments
+          setZoom(prev => Math.max(0.1, Math.min(3.0, prev + delta)));
+        }
+        // If not over the board, we've prevented browser zoom but don't apply any custom zoom
       }
     };
 
@@ -571,7 +577,7 @@ const BoardPage: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('wheel', handleGlobalWheel);
     };
-  }, [zoomIn, zoomOut, resetZoom, handleDeleteSelected]);
+  }, [zoomIn, zoomOut, resetZoom, handleDeleteSelected, setZoom]);
 
   if (isLoading) {
     return (
