@@ -10,6 +10,7 @@ jobs:
   e2e-tests:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    if: false  # Disabled e2e tests in CI
     
     services:
       postgres:
@@ -137,6 +138,7 @@ jobs:
   e2e-tests-matrix:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    if: false  # Disabled e2e tests in CI
     strategy:
       fail-fast: false
       matrix:

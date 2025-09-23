@@ -6,18 +6,40 @@ import (
 
 	"evidence-wall/boards-service/internal/service"
 	"evidence-wall/shared/middleware"
+	"evidence-wall/shared/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
+// BoardServiceInterface defines the interface for board service operations
+type BoardServiceInterface interface {
+	CreateBoard(userID uuid.UUID, req service.CreateBoardRequest) (*models.Board, error)
+	GetBoard(boardID, userID uuid.UUID) (*models.BoardResponse, error)
+	GetPublicBoard(boardID uuid.UUID) (*models.Board, error)
+	ListBoards(userID uuid.UUID, offset, limit int) ([]models.BoardResponse, int64, error)
+	UpdateBoard(boardID, userID uuid.UUID, req service.UpdateBoardRequest) (*models.Board, error)
+	DeleteBoard(boardID, userID uuid.UUID) error
+	ShareBoard(boardID, ownerID uuid.UUID, req service.ShareBoardRequest) error
+	UnshareBoard(boardID, ownerID, targetUserID uuid.UUID) error
+	UpdateUserPermission(boardID, ownerID, targetUserID uuid.UUID, req service.UpdateUserPermissionRequest) error
+	CreateBoardItem(boardID, userID uuid.UUID, req service.CreateItemRequest) (*models.BoardItem, error)
+	UpdateBoardItem(boardID, itemID, userID uuid.UUID, req service.UpdateItemRequest) (*models.BoardItem, error)
+	DeleteBoardItem(boardID, itemID, userID uuid.UUID) error
+	ListBoardItems(boardID, userID uuid.UUID) ([]models.BoardItem, error)
+	ListBoardConnections(boardID, userID uuid.UUID) ([]models.BoardConnection, error)
+	CreateBoardConnection(boardID, userID uuid.UUID, req service.CreateConnectionRequest) (*models.BoardConnection, error)
+	UpdateBoardConnection(boardID, connectionID, userID uuid.UUID, req service.UpdateConnectionRequest) (*models.BoardConnection, error)
+	DeleteBoardConnection(boardID, connectionID, userID uuid.UUID) error
+}
+
 // BoardHandler handles board HTTP requests
 type BoardHandler struct {
-	boardService *service.BoardService
+	boardService BoardServiceInterface
 }
 
 // NewBoardHandler creates a new board handler
-func NewBoardHandler(boardService *service.BoardService) *BoardHandler {
+func NewBoardHandler(boardService BoardServiceInterface) *BoardHandler {
 	return &BoardHandler{
 		boardService: boardService,
 	}
@@ -595,8 +617,8 @@ func (h *BoardHandler) DeleteBoardItem(c *gin.Context) {
 		return
 	}
 
-    // Router uses :id for board identifier (see routes setup)
-    boardID, err := uuid.Parse(c.Param("id"))
+	// Router uses :id for board identifier (see routes setup)
+	boardID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid board ID"})
 		return

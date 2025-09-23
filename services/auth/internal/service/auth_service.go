@@ -8,8 +8,6 @@ import (
 	"io"
 
 	"evidence-wall/auth-service/internal/config"
-	"evidence-wall/auth-service/internal/repository"
-	"evidence-wall/shared/auth"
 	"evidence-wall/shared/models"
 
 	"github.com/google/uuid"
@@ -27,14 +25,14 @@ var (
 
 // AuthService handles authentication business logic
 type AuthService struct {
-	userRepo    *repository.UserRepository
-	jwtManager  *auth.JWTManager
+	userRepo    UserRepositoryInterface
+	jwtManager  JWTManagerInterface
 	config      *config.Config
 	oauthConfig *oauth2.Config
 }
 
 // NewAuthService creates a new auth service
-func NewAuthService(userRepo *repository.UserRepository, jwtManager *auth.JWTManager, cfg *config.Config) *AuthService {
+func NewAuthService(userRepo UserRepositoryInterface, jwtManager JWTManagerInterface, cfg *config.Config) *AuthService {
 	var oauthConfig *oauth2.Config
 	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
 		oauthConfig = &oauth2.Config{
@@ -219,11 +217,11 @@ func (s *AuthService) UpdateProfile(userID uuid.UUID, req UpdateProfileRequest) 
 }
 
 // GetGoogleLoginURL returns the Google OAuth login URL
-func (s *AuthService) GetGoogleLoginURL(state string) string {
+func (s *AuthService) GetGoogleLoginURL(state string) (string, error) {
 	if s.oauthConfig == nil {
-		return ""
+		return "", errors.New("Google OAuth not configured")
 	}
-	return s.oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
+	return s.oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline), nil
 }
 
 // GoogleUserInfo represents user info from Google
@@ -278,8 +276,8 @@ func (s *AuthService) GoogleCallback(code string) (*AuthResponse, error) {
 		}
 
 		if user != nil {
-            // Link Google account to existing user
-            user.GoogleID = &googleUser.ID
+			// Link Google account to existing user
+			user.GoogleID = &googleUser.ID
 			if user.Avatar == "" {
 				user.Avatar = googleUser.Picture
 			}
@@ -288,11 +286,11 @@ func (s *AuthService) GoogleCallback(code string) (*AuthResponse, error) {
 			}
 		} else {
 			// Create new user
-            user = &models.User{
+			user = &models.User{
 				Email:    googleUser.Email,
 				Name:     googleUser.Name,
 				Avatar:   googleUser.Picture,
-                GoogleID: func() *string { v := googleUser.ID; return &v }(),
+				GoogleID: func() *string { v := googleUser.ID; return &v }(),
 				Password: uuid.New().String(), // Random password for Google users
 				Verified: true,                // Google accounts are pre-verified
 				Active:   true,
@@ -315,5 +313,3 @@ func (s *AuthService) GoogleCallback(code string) (*AuthResponse, error) {
 		Token: jwtToken,
 	}, nil
 }
-
-

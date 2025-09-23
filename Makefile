@@ -44,7 +44,7 @@ test:
 	cd services/auth && go test ./...
 	cd services/boards && go test ./...
 	@echo "Testing frontend..."
-	cd frontend && npm test -- --coverage --watchAll=false
+	cd frontend && npm run test:run -- --coverage
 
 # Clean build artifacts
 clean:

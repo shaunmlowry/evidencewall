@@ -215,8 +215,8 @@ func (h *AuthHandler) GoogleLogin(c *gin.Context) {
 
 	// Store state in session or return it to client
 	// For simplicity, we'll include it in the redirect URL
-	url := h.authService.GetGoogleLoginURL(state)
-	if url == "" {
+	url, err := h.authService.GetGoogleLoginURL(state)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Google OAuth not configured"})
 		return
 	}
