@@ -16,7 +16,7 @@ services:
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: evidencewall
-      POSTGRES_PASSWORD: evidencewall_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: evidencewall
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -52,10 +52,10 @@ services:
     networks:
       - backend
     environment:
-      - DATABASE_URL=postgres://evidencewall:evidencewall_password@postgres:5432/evidencewall?sslmode=disable
+      - DATABASE_URL=postgres://evidencewall:${POSTGRES_PASSWORD}@postgres:5432/evidencewall?sslmode=disable
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRY=24h
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
@@ -78,10 +78,10 @@ services:
     networks:
       - backend
     environment:
-      - DATABASE_URL=postgres://evidencewall:evidencewall_password@postgres:5432/evidencewall?sslmode=disable
+      - DATABASE_URL=postgres://evidencewall:${POSTGRES_PASSWORD}@postgres:5432/evidencewall?sslmode=disable
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - JWT_SECRET=${JWT_SECRET}
       - AUTH_SERVICE_URL=http://auth-service:8001
       - CORS_ORIGINS=http://localhost,https://localhost
       - ENVIRONMENT=production
@@ -105,7 +105,7 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - JWT_SECRET=${JWT_SECRET}
       - ENVIRONMENT=production
     depends_on:
       redis:
