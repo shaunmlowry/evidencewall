@@ -67,6 +67,46 @@ API endpoints are protected with rate limiting:
 - All external traffic goes through NGINX proxy
 - SSL/TLS termination at proxy level
 
+## Token Security
+
+### Frontend Token Storage
+
+The application uses secure token storage utilities to manage JWT tokens:
+
+- **Automatic Expiry**: Tokens are automatically removed when expired
+- **Secure Storage**: Tokens are stored with expiry tracking
+- **Validation**: Token validity is checked before use
+- **Cleanup**: Expired tokens are automatically removed
+
+### Token Refresh
+
+- Tokens are automatically refreshed when approaching expiry
+- Failed token validation triggers automatic logout
+- Secure token parsing without server verification
+
+## Input Validation
+
+### Backend Validation
+
+All user inputs are validated and sanitized:
+
+- **Length Limits**: Maximum lengths enforced for all text fields
+- **HTML Sanitization**: HTML tags removed and entities escaped
+- **Content Validation**: Board items and descriptions validated
+- **Type Checking**: Strict type validation for all inputs
+
+### Frontend Validation
+
+- Client-side validation for immediate feedback
+- Server-side validation as the final security layer
+- Consistent validation rules across frontend and backend
+
+## CSRF Protection
+
+- **State Parameter**: Google OAuth uses state parameter for CSRF protection
+- **Token Validation**: State parameter validation in OAuth callbacks
+- **Secure Headers**: CSRF protection headers implemented
+
 ## Reporting Security Issues
 
 If you discover a security vulnerability, please report it to the development team immediately. Do not create public issues for security vulnerabilities.
