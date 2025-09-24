@@ -43,8 +43,10 @@ func main() {
 
 	server.OnConnect("/", func(s socketio.Conn) error {
 		// Authenticate using token passed in auth
-		token, _ := s.URL().Query()["token"]
-		if len(token) == 0 {
+		url := s.URL()
+		query := url.Query()
+		token, ok := query["token"]
+		if !ok || len(token) == 0 {
 			s.Close()
 			return nil
 		}
