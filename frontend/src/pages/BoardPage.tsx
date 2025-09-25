@@ -1061,6 +1061,7 @@ const SuspectCardContent: React.FC<SuspectCardContentProps> = ({
   const stopDrag = (e: React.MouseEvent) => e.stopPropagation();
   const [suspect, setSuspect] = React.useState(parse(content || ''));
   const [suspectIsEditing, setSuspectIsEditing] = React.useState(false);
+  const cardRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     setSuspect(parse(content || ''));
@@ -1070,17 +1071,44 @@ const SuspectCardContent: React.FC<SuspectCardContentProps> = ({
     setSuspectIsEditing(isParentEditing);
   }, [isParentEditing]);
 
-  const commitSuspect = () => {
+  const commitSuspect = React.useCallback(() => {
     onUpdateContent(format(suspect));
     setSuspectIsEditing(false);
     onRequestSetParentEditing(false);
-  };
+  }, [suspect, onUpdateContent, onRequestSetParentEditing, format]);
+
+  const handleFieldBlur = React.useCallback((e: React.FocusEvent) => {
+    // Check if the new focus target is still within the card
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    if (cardRef.current && relatedTarget && cardRef.current.contains(relatedTarget)) {
+      // Focus is moving to another field within the same card, don't commit
+      return;
+    }
+    // Focus is leaving the card entirely, commit the changes
+    commitSuspect();
+  }, [commitSuspect]);
 
   const handleFieldClick = (e: React.MouseEvent) => {
     if (suspectIsEditing) {
       onEditableClick(e);
     }
   };
+
+  // Set up click outside listener when editing
+  React.useEffect(() => {
+    if (!suspectIsEditing) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (cardRef.current && !cardRef.current.contains(event.target as Node)) {
+        commitSuspect();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [suspectIsEditing, commitSuspect]);
 
   if (!canEdit || !suspectIsEditing) {
     return (
@@ -1113,12 +1141,12 @@ const SuspectCardContent: React.FC<SuspectCardContentProps> = ({
   }
 
   return (
-    <Box>
+    <Box ref={cardRef}>
       <TextField
         label="Name"
         value={suspect.name}
         onChange={(e) => setSuspect((s) => ({ ...s, name: e.target.value }))}
-        onBlur={commitSuspect}
+        onBlur={handleFieldBlur}
         variant="outlined"
         size="small"
         fullWidth
@@ -1137,7 +1165,7 @@ const SuspectCardContent: React.FC<SuspectCardContentProps> = ({
           label="Age"
           value={suspect.age}
           onChange={(e) => setSuspect((s) => ({ ...s, age: e.target.value }))}
-          onBlur={commitSuspect}
+          onBlur={handleFieldBlur}
           variant="outlined"
           size="small"
           sx={{
@@ -1154,7 +1182,7 @@ const SuspectCardContent: React.FC<SuspectCardContentProps> = ({
           label="Last seen"
           value={suspect.lastSeen}
           onChange={(e) => setSuspect((s) => ({ ...s, lastSeen: e.target.value }))}
-          onBlur={commitSuspect}
+          onBlur={handleFieldBlur}
           variant="outlined"
           size="small"
           fullWidth
@@ -1172,7 +1200,7 @@ const SuspectCardContent: React.FC<SuspectCardContentProps> = ({
         label="Notes"
         value={suspect.notes}
         onChange={(e) => setSuspect((s) => ({ ...s, notes: e.target.value }))}
-        onBlur={commitSuspect}
+        onBlur={handleFieldBlur}
         variant="outlined"
         size="small"
         fullWidth
