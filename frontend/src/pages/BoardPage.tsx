@@ -22,13 +22,13 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useSocket } from '../contexts/SocketContext';
+import { useWebSocket } from '../contexts/WebSocketContext';
 import { boardsApi } from '../services/api';
 
 const BoardPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { joinBoard, leaveBoard, socket } = useSocket();
+  const { joinBoard, leaveBoard, isConnected, onBoardUpdate } = useWebSocket();
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [isConnecting, setIsConnecting] = useState(false);
   const [items, setItems] = useState<Array<{
@@ -113,7 +113,8 @@ const BoardPage: React.FC = () => {
 
   // Listen for realtime updates
   useEffect(() => {
-    if (!socket || !id) return;
+    if (!id) return;
+    
     const handler = (raw: any) => {
       try {
         const msg = typeof raw === 'string' ? JSON.parse(raw) : raw;
@@ -182,11 +183,9 @@ const BoardPage: React.FC = () => {
         }
       } catch {}
     };
-    socket.on('board_update', handler);
-    return () => {
-      socket.off('board_update', handler);
-    };
-  }, [socket, id]);
+    
+    onBoardUpdate(handler);
+  }, [id, onBoardUpdate]);
 
   // (removed debug global click listener)
 

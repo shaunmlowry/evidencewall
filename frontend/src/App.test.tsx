@@ -20,15 +20,14 @@ vi.mock('./contexts/AuthContext', () => ({
   }),
 }));
 
-// Mock the SocketProvider
-vi.mock('./contexts/SocketContext', () => ({
-  SocketProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  useSocket: () => ({
-    socket: null,
+// Mock the WebSocketProvider
+vi.mock('./contexts/WebSocketContext', () => ({
+  WebSocketProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  useWebSocket: () => ({
     isConnected: false,
     joinBoard: vi.fn(),
     leaveBoard: vi.fn(),
-    sendMessage: vi.fn(),
+    onBoardUpdate: vi.fn(),
   }),
 }));
 

@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
 import { AuthProvider } from './contexts/AuthContext';
-import { SocketProvider } from './contexts/SocketContext';
+import { WebSocketProvider } from './contexts/WebSocketContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 
@@ -52,7 +52,7 @@ function App() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <AuthProvider>
-          <SocketProvider>
+          <WebSocketProvider>
             <Router>
               <Routes>
                 {/* Public routes */}
@@ -71,7 +71,7 @@ function App() {
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </Router>
-          </SocketProvider>
+          </WebSocketProvider>
         </AuthProvider>
       </ThemeProvider>
       <ReactQueryDevtools initialIsOpen={false} />
