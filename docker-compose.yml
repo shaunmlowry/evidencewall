@@ -1,13 +1,6 @@
 networks:
-  # Internal network for database and cache services
-  internal:
-    driver: bridge
-    internal: true
-  # Backend network for API services
-  backend:
-    driver: bridge
-  # Frontend network for public-facing services
-  frontend:
+  # Simplified single network for all services
+  app:
     driver: bridge
 
 services:
@@ -22,8 +15,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d
     networks:
-      - internal
-      - backend
+      - app
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U evidencewall"]
       interval: 30s
@@ -36,8 +28,7 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - internal
-      - backend
+      - app
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
@@ -50,7 +41,7 @@ services:
       context: .
       dockerfile: services/auth/Dockerfile
     networks:
-      - backend
+      - app
     environment:
       - DATABASE_URL=postgres://evidencewall:${POSTGRES_PASSWORD}@postgres:5432/evidencewall?sslmode=disable
       - REDIS_HOST=redis
@@ -76,7 +67,7 @@ services:
       context: .
       dockerfile: services/boards/Dockerfile
     networks:
-      - backend
+      - app
     environment:
       - DATABASE_URL=postgres://evidencewall:${POSTGRES_PASSWORD}@postgres:5432/evidencewall?sslmode=disable
       - REDIS_HOST=redis
@@ -101,7 +92,7 @@ services:
       context: .
       dockerfile: services/realtime/Dockerfile
     networks:
-      - backend
+      - app
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -112,44 +103,28 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # Reverse Proxy (NGINX)
+  # Unified NGINX (serves frontend + reverse proxy)
   nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-    networks:
-      - frontend
-      - backend
-    depends_on:
-      - frontend
-      - auth-service
-      - boards-service
-      - realtime-service
-    restart: unless-stopped
-
-  # Frontend
-  frontend:
     build:
       context: .
-      dockerfile: frontend/Dockerfile
+      dockerfile: nginx/Dockerfile.unified
       args:
         VITE_API_BASE_URL: /api/auth
         VITE_BOARDS_API_URL: /api/boards
         VITE_WEBSOCKET_URL: /api/realtime
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/ssl:/etc/nginx/ssl:ro
     networks:
-      - frontend
+      - app
     environment:
-      - VITE_API_BASE_URL=/api/auth
-      - VITE_BOARDS_API_URL=/api/boards
-      - VITE_WEBSOCKET_URL=/api/realtime
       - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     depends_on:
       - auth-service
       - boards-service
+      - realtime-service
     restart: unless-stopped
 
 volumes:

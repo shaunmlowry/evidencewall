@@ -63,22 +63,33 @@ func main() {
 	server.OnEvent("/", "join_board", func(s socketio.Conn, payload map[string]string) {
 		boardID := strings.TrimSpace(payload["board_id"])
 		if boardID == "" {
+			log.Printf("join_board: empty board_id from socket %s", s.ID())
 			return
 		}
+		log.Printf("join_board: socket %s joining board %s", s.ID(), boardID)
+
 		// Join room and start Redis subscription for this board
 		s.Join(boardID)
 		if _, ok := socketBoards[s.ID()][boardID]; ok {
+			log.Printf("join_board: socket %s already subscribed to board %s", s.ID(), boardID)
 			return
 		}
 		socketBoards[s.ID()][boardID] = struct{}{}
 
 		go func(room string, sid string) {
-			sub := rdb.Subscribe(context.Background(), "board:"+room)
+			channel := "board:" + room
+			log.Printf("join_board: starting Redis subscription for socket %s on channel %s", sid, channel)
+			sub := rdb.Subscribe(context.Background(), channel)
+			defer sub.Close()
+
 			ch := sub.Channel()
 			for msg := range ch {
+				log.Printf("join_board: received Redis message on channel %s: %s", msg.Channel, msg.Payload)
 				// Forward raw JSON payload to room
 				server.BroadcastToRoom("/", room, "board_update", msg.Payload)
+				log.Printf("join_board: broadcasted message to room %s", room)
 			}
+			log.Printf("join_board: Redis subscription ended for socket %s on channel %s", sid, channel)
 		}(boardID, s.ID())
 	})
 

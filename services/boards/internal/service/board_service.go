@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"html"
+	"log"
 	"regexp"
 	"strings"
 
@@ -27,10 +28,10 @@ var (
 
 // Input validation constants
 const (
-	MaxTitleLength    = 200
-	MaxContentLength  = 5000
+	MaxTitleLength       = 200
+	MaxContentLength     = 5000
 	MaxDescriptionLength = 1000
-	MaxNameLength     = 100
+	MaxNameLength        = 100
 )
 
 // HTML tag regex for sanitization
@@ -41,14 +42,14 @@ func validateAndSanitizeString(input string, maxLength int, fieldName string) (s
 	if len(input) > maxLength {
 		return "", fmt.Errorf("%s: %w (max %d characters)", fieldName, ErrInputTooLong, maxLength)
 	}
-	
+
 	// Remove HTML tags and escape HTML entities
 	sanitized := htmlTagRegex.ReplaceAllString(input, "")
 	sanitized = html.EscapeString(sanitized)
-	
+
 	// Trim whitespace
 	sanitized = strings.TrimSpace(sanitized)
-	
+
 	return sanitized, nil
 }
 
@@ -115,7 +116,7 @@ func (s *BoardService) CreateBoard(userID uuid.UUID, req CreateBoardRequest) (*m
 	if err != nil {
 		return nil, fmt.Errorf("title validation failed: %w", err)
 	}
-	
+
 	description, err := validateDescription(req.Description)
 	if err != nil {
 		return nil, fmt.Errorf("description validation failed: %w", err)
@@ -559,6 +560,7 @@ func (s *BoardService) ListBoardItems(boardID, userID uuid.UUID) ([]models.Board
 // Helper function to publish real-time updates
 func (s *BoardService) publishBoardUpdate(boardID uuid.UUID, event string, data interface{}) {
 	if s.redis == nil {
+		log.Printf("publishBoardUpdate: Redis client is nil, skipping publish")
 		return
 	}
 
@@ -569,7 +571,15 @@ func (s *BoardService) publishBoardUpdate(boardID uuid.UUID, event string, data 
 	}
 
 	updateJSON, _ := json.Marshal(update)
-	s.redis.Publish(context.Background(), fmt.Sprintf("board:%s", boardID), updateJSON)
+	channel := fmt.Sprintf("board:%s", boardID)
+	log.Printf("publishBoardUpdate: Publishing to channel %s: %s", channel, string(updateJSON))
+
+	result := s.redis.Publish(context.Background(), channel, updateJSON)
+	if err := result.Err(); err != nil {
+		log.Printf("publishBoardUpdate: Error publishing to Redis: %v", err)
+	} else {
+		log.Printf("publishBoardUpdate: Successfully published to %d subscribers", result.Val())
+	}
 }
 
 // ----- Connections -----

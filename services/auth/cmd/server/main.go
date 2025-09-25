@@ -68,15 +68,15 @@ func main() {
 		log.Printf("auth:data normalize warning: %v", err)
 	}
 
-	// Run migrations
-	if err := database.AutoMigrate(db); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
-	}
+	// Run migrations (temporarily disabled to debug)
+	// if err := database.AutoMigrate(db); err != nil {
+	//	log.Fatalf("Failed to run migrations: %v", err)
+	// }
 
-	// Create indexes
-	if err := database.CreateIndexes(db); err != nil {
-		log.Printf("Warning: Failed to create indexes: %v", err)
-	}
+	// Create indexes (temporarily disabled to debug)
+	// if err := database.CreateIndexes(db); err != nil {
+	//	log.Printf("Warning: Failed to create indexes: %v", err)
+	// }
 
 	// Initialize JWT manager
 	jwtExpiry, err := time.ParseDuration(cfg.JWTExpiry)
