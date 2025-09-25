@@ -35,6 +35,8 @@ build:
 	cd services/auth && go build -o ../../bin/auth-service ./cmd/server
 	@echo "Building boards service..."
 	cd services/boards && go build -o ../../bin/boards-service ./cmd/server
+	@echo "Building realtime service..."
+	cd services/realtime && go build -o ../../bin/realtime-service ./cmd/server
 	@echo "Building frontend..."
 	cd frontend && npm run build
 
