@@ -94,12 +94,6 @@ func main() {
 		handleWebSocket(hub, jwtManager, w, r)
 	})
 
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Health check from %s", r.RemoteAddr)
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
-	})
-
 	log.Printf("WebSocket server listening on :8003")
 	if err := http.ListenAndServe(":8003", nil); err != nil {
 		log.Fatalf("server error: %v", err)
@@ -113,7 +107,6 @@ func (h *Hub) run() {
 			h.mutex.Lock()
 			h.clients[client] = true
 			h.mutex.Unlock()
-			log.Printf("Client registered: %s (%s)", client.userEmail, client.userID)
 
 		case client := <-h.unregister:
 			h.mutex.Lock()
@@ -133,7 +126,6 @@ func (h *Hub) run() {
 				close(client.send)
 			}
 			h.mutex.Unlock()
-			log.Printf("Client unregistered: %s (%s)", client.userEmail, client.userID)
 
 		case message := <-h.broadcast:
 			var msg Message
@@ -222,8 +214,6 @@ func (c *Client) readPump(hub *Hub) {
 			break
 		}
 
-		log.Printf("Received WebSocket message from %s: %s", c.userEmail, string(message))
-
 		var msg Message
 		if err := json.Unmarshal(message, &msg); err != nil {
 			log.Printf("Error unmarshaling message: %v", err)
@@ -289,7 +279,6 @@ func (c *Client) joinBoard(hub *Hub, boardID string) {
 	}
 	hub.boardRooms[boardID][c] = true
 
-	log.Printf("Client %s joined board %s", c.userEmail, boardID)
 }
 
 func (c *Client) leaveBoard(hub *Hub, boardID string) {
@@ -313,7 +302,6 @@ func (c *Client) leaveBoard(hub *Hub, boardID string) {
 		}
 	}
 
-	log.Printf("Client %s left board %s", c.userEmail, boardID)
 }
 
 func subscribeToRedis(rdb *redis.Client, hub *Hub) {
@@ -324,7 +312,6 @@ func subscribeToRedis(rdb *redis.Client, hub *Hub) {
 	log.Printf("Subscribed to Redis pattern: board:*")
 
 	for msg := range pubsub.Channel() {
-		log.Printf("Received Redis message on channel %s", msg.Channel)
 
 		// Extract board ID from channel name (board:uuid)
 		parts := strings.Split(msg.Channel, ":")
@@ -350,7 +337,6 @@ func subscribeToRedis(rdb *redis.Client, hub *Hub) {
 		// Broadcast to clients in this board
 		hub.mutex.RLock()
 		if room, exists := hub.boardRooms[boardID]; exists {
-			log.Printf("Broadcasting to %d clients in board %s", len(room), boardID)
 			for client := range room {
 				select {
 				case client.send <- messageBytes:
@@ -361,7 +347,6 @@ func subscribeToRedis(rdb *redis.Client, hub *Hub) {
 				}
 			}
 		} else {
-			log.Printf("No clients in board %s", boardID)
 		}
 		hub.mutex.RUnlock()
 	}

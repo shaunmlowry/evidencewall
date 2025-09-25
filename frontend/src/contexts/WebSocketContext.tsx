@@ -48,11 +48,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     try {
       const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/realtime/ws?token=${encodeURIComponent(token)}`;
       
-      console.log('Connecting to WebSocket:', wsUrl);
       wsRef.current = new WebSocket(wsUrl);
 
       wsRef.current.onopen = () => {
-        console.log('WebSocket connected');
         setIsConnected(true);
         reconnectAttempts.current = 0;
         
@@ -60,7 +58,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         while (messageQueueRef.current.length > 0) {
           const message = messageQueueRef.current.shift();
           if (message && wsRef.current?.readyState === WebSocket.OPEN) {
-            console.log('Sending queued message:', message);
             wsRef.current.send(JSON.stringify(message));
           }
         }
@@ -69,7 +66,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       wsRef.current.onmessage = (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
-          console.log('WebSocket message received:', message);
 
           if (message.type === 'board_update' && boardUpdateCallbackRef.current) {
             boardUpdateCallbackRef.current(message.data);
@@ -118,16 +114,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
   const sendMessage = useCallback((message: WebSocketMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      console.log('Sending WebSocket message:', message);
       wsRef.current.send(JSON.stringify(message));
     } else {
-      console.log('WebSocket not ready, queueing message:', message);
       messageQueueRef.current.push(message);
     }
   }, []);
 
   const joinBoard = useCallback((boardId: string) => {
-    console.log('Joining board:', boardId);
     sendMessage({
       type: 'join_board',
       board_id: boardId
@@ -135,7 +128,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   }, [sendMessage]);
 
   const leaveBoard = useCallback((boardId: string) => {
-    console.log('Leaving board:', boardId);
     sendMessage({
       type: 'leave_board',
       board_id: boardId
