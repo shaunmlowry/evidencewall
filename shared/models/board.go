@@ -61,17 +61,15 @@ type BoardUser struct {
 type ItemType string
 
 const (
-	ItemTypeText  ItemType = "text"
-	ItemTypeImage ItemType = "image"
-	ItemTypeNote  ItemType = "note"
-	ItemTypeLink  ItemType = "link"
+	ItemTypePostIt      ItemType = "post-it"
+	ItemTypeSuspectCard ItemType = "suspect-card"
 )
 
 // BoardItem represents an item on the board (post-it note or suspect card)
 type BoardItem struct {
 	ID        uuid.UUID      `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	BoardID   uuid.UUID      `json:"board_id" gorm:"type:uuid;not null"`
-	Type      ItemType       `json:"type" gorm:"not null"`
+	Type      string         `json:"type" gorm:"not null"`
 	X         float64        `json:"x" gorm:"not null"`
 	Y         float64        `json:"y" gorm:"not null"`
 	Width     float64        `json:"width" gorm:"default:200"`
@@ -79,8 +77,7 @@ type BoardItem struct {
 	Rotation  float64        `json:"rotation" gorm:"default:0"`
 	ZIndex    int            `json:"z_index" gorm:"default:1"`
 	Content   string         `json:"content"`
-	Color     string         `json:"color"`
-	Metadata  []byte         `json:"metadata" gorm:"type:jsonb"`
+	Style     []byte         `json:"style" gorm:"type:jsonb"` // JSON string for styling properties including color
 	CreatedBy uuid.UUID      `json:"created_by" gorm:"type:uuid;not null"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
@@ -89,7 +86,7 @@ type BoardItem struct {
 	// Relationships
 	Board       Board             `json:"board,omitempty" gorm:"foreignKey:BoardID"`
 	Creator     User              `json:"creator,omitempty" gorm:"foreignKey:CreatedBy"`
-	Connections []BoardConnection `json:"connections,omitempty" gorm:"many2many:board_item_connections;"`
+	Connections []BoardConnection `json:"connections,omitempty" gorm:"many2many:board_item_connections"`
 }
 
 // BoardConnection represents a connection between two board items

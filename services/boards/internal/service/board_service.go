@@ -349,7 +349,7 @@ func (s *BoardService) UpdateUserPermission(boardID, ownerID, targetUserID uuid.
 
 // CreateItemRequest represents a board item creation request
 type CreateItemRequest struct {
-	Type     models.ItemType        `json:"type" binding:"required,oneof=text image note link"`
+	Type     string                 `json:"type" binding:"required,oneof=post-it suspect-card note"`
 	Content  string                 `json:"content" binding:"required"`
 	X        float64                `json:"x" binding:"required"`
 	Y        float64                `json:"y" binding:"required"`
@@ -379,27 +379,46 @@ func (s *BoardService) CreateBoardItem(boardID, userID uuid.UUID, req CreateItem
 		return nil, fmt.Errorf("content validation failed: %w", err)
 	}
 
-	// Convert metadata to JSON
-	var metadataJSON []byte
-	if req.Metadata != nil {
-		metadataJSON, _ = json.Marshal(req.Metadata)
-	}
-
 	// Determine persisted item type to satisfy DB constraints.
 	// Frontend may send req.Type = "note" and specify UI variant in metadata.variant.
 	// Map to DB types: 'post-it' | 'suspect-card'. Default to 'post-it'.
-	persistedType := models.ItemType("post-it")
-	if req.Metadata != nil {
-		if v, ok := req.Metadata["variant"]; ok {
-			if vs, ok := v.(string); ok {
-				switch vs {
-				case "suspect-card":
-					persistedType = models.ItemType("suspect-card")
-				case "post-it":
-					persistedType = models.ItemType("post-it")
+	persistedType := "post-it"
+	if req.Type == "note" {
+		// For "note" type, check metadata.variant to determine actual type
+		if req.Metadata != nil {
+			if v, ok := req.Metadata["variant"]; ok {
+				if vs, ok := v.(string); ok {
+					switch vs {
+					case "suspect-card":
+						persistedType = "suspect-card"
+					case "post-it":
+						persistedType = "post-it"
+					}
 				}
 			}
 		}
+	} else {
+		// Direct mapping for explicit types
+		switch req.Type {
+		case "post-it":
+			persistedType = "post-it"
+		case "suspect-card":
+			persistedType = "suspect-card"
+		}
+	}
+
+	// Combine color, metadata and other styling into a single style JSON field
+	styleData := make(map[string]interface{})
+	if req.Color != "" {
+		styleData["color"] = req.Color
+	}
+	if req.Metadata != nil {
+		styleData["metadata"] = req.Metadata
+	}
+
+	var styleJSON []byte
+	if len(styleData) > 0 {
+		styleJSON, _ = json.Marshal(styleData)
 	}
 
 	item := &models.BoardItem{
@@ -411,8 +430,7 @@ func (s *BoardService) CreateBoardItem(boardID, userID uuid.UUID, req CreateItem
 		Width:     req.Width,
 		Height:    req.Height,
 		ZIndex:    req.ZIndex,
-		Color:     req.Color,
-		Metadata:  metadataJSON,
+		Style:     styleJSON,
 		CreatedBy: userID,
 	}
 
@@ -482,12 +500,31 @@ func (s *BoardService) UpdateBoardItem(boardID, itemID, userID uuid.UUID, req Up
 	if req.ZIndex != nil {
 		item.ZIndex = *req.ZIndex
 	}
-	if req.Color != "" {
-		item.Color = req.Color
-	}
-	if req.Metadata != nil {
-		metadataJSON, _ := json.Marshal(req.Metadata)
-		item.Metadata = metadataJSON
+
+	// Update style field if color or metadata provided
+	if req.Color != "" || req.Metadata != nil {
+		// Parse existing style data
+		var existingStyle map[string]interface{}
+		if len(item.Style) > 0 {
+			json.Unmarshal(item.Style, &existingStyle)
+		}
+		if existingStyle == nil {
+			existingStyle = make(map[string]interface{})
+		}
+
+		// Update color if provided
+		if req.Color != "" {
+			existingStyle["color"] = req.Color
+		}
+
+		// Update metadata if provided
+		if req.Metadata != nil {
+			existingStyle["metadata"] = req.Metadata
+		}
+
+		// Marshal back to JSON
+		styleJSON, _ := json.Marshal(existingStyle)
+		item.Style = styleJSON
 	}
 
 	if err := s.boardItemRepo.Update(item); err != nil {

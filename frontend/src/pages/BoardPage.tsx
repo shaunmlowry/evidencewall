@@ -351,22 +351,31 @@ const BoardPage: React.FC = () => {
   useEffect(() => {
     if (!board) return;
     const mappedItems = (board.items || []).map((it: any) => {
-      // Determine UI type from metadata.variant (fallback to post-it)
-      let meta: any = undefined;
-      if (it && typeof it.metadata === 'object') {
-        meta = it.metadata;
-      } else if (it && typeof it.metadata === 'string') {
+      // Parse style field to extract color and metadata
+      let styleData: any = {};
+      if (it && typeof it.style === 'string') {
         try {
-          const decoded = atob(it.metadata);
+          styleData = JSON.parse(it.style);
+        } catch {}
+      } else if (it && typeof it.style === 'object') {
+        styleData = it.style;
+      }
+      
+      // Determine UI type from style.metadata.variant (fallback to post-it)
+      let meta: any = styleData.metadata;
+      if (meta && typeof meta === 'string') {
+        try {
+          const decoded = atob(meta);
           meta = JSON.parse(decoded);
         } catch {
           try {
-            meta = JSON.parse(it.metadata);
+            meta = JSON.parse(meta);
           } catch {}
         }
       }
       const variant = meta?.variant;
       const uiType: 'post-it' | 'suspect-card' = variant === 'suspect-card' ? 'suspect-card' : 'post-it';
+      
       return {
         id: it.id, // Use server ID as frontend ID for loaded items
         type: uiType,
@@ -377,7 +386,7 @@ const BoardPage: React.FC = () => {
         rotation: (it as any).rotation ?? 0,
         z_index: it.z_index ?? 1,
         content: it.content || '',
-        color: (it as any).color,
+        color: styleData.color,
         serverId: it.id,
       };
     });

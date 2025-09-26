@@ -64,15 +64,15 @@ func main() {
 		log.Fatalf("boards:db connect error: %v", err)
 	}
 
-	// Run migrations (temporarily disabled due to migration issues)
-	// if err := database.AutoMigrate(db); err != nil {
-	//	log.Fatalf("Failed to run migrations: %v", err)
-	// }
+	// Run GORM auto-migrations with latest version and simplified models
+	if err := database.AutoMigrate(db); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
 
-	// Create indexes (temporarily disabled due to migration issues)
-	// if err := database.CreateIndexes(db); err != nil {
-	//	log.Printf("Warning: Failed to create indexes: %v", err)
-	// }
+	// Create additional indexes for performance
+	if err := database.CreateIndexes(db); err != nil {
+		log.Printf("Warning: Failed to create indexes: %v", err)
+	}
 
 	// Connect to Redis
 	rdb := redis.NewClient(&redis.Options{
