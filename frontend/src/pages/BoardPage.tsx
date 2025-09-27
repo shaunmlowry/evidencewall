@@ -128,7 +128,7 @@ const BoardPage: React.FC = () => {
                 ...prev,
                 {
                   id: it.id,
-                  type: ((it.metadata && (JSON.parse(typeof it.metadata === 'string' ? it.metadata : JSON.stringify(it.metadata)).variant)) === 'suspect-card') ? 'suspect-card' : 'post-it',
+                  type: it.type,
                   x: it.x,
                   y: it.y,
                   width: it.width,
@@ -373,12 +373,9 @@ const BoardPage: React.FC = () => {
           } catch {}
         }
       }
-      const variant = meta?.variant;
-      const uiType: 'post-it' | 'suspect-card' = variant === 'suspect-card' ? 'suspect-card' : 'post-it';
-      
       return {
         id: it.id, // Use server ID as frontend ID for loaded items
-        type: uiType,
+        type: it.type,
         x: it.x,
         y: it.y,
         width: it.width,

@@ -16,8 +16,6 @@ services:
       - ./frontend/tsconfig.json:/app/tsconfig.json
       - ./frontend/vite.config.ts:/app/vite.config.ts
     depends_on: []
-    networks:
-      - default
 
   # Nginx reverse proxy for dev
   nginx:
