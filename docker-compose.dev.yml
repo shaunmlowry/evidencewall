@@ -16,6 +16,8 @@ services:
       - ./frontend/tsconfig.json:/app/tsconfig.json
       - ./frontend/vite.config.ts:/app/vite.config.ts
     depends_on: []
+    networks:
+      - default
 
   # Nginx reverse proxy for dev
   nginx:
@@ -53,6 +55,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - default
 
   # Boards service for dev
   boards-service:
@@ -77,6 +81,8 @@ services:
         condition: service_healthy
       auth-service:
         condition: service_started
+    networks:
+      - default
 
   # Realtime service for dev
   realtime-service:
@@ -93,6 +99,9 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    networks:
+      - default
+
   # Database for development
   postgres:
     image: postgres:15-alpine
@@ -110,6 +119,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - default
 
   # Redis for development
   redis:
@@ -123,6 +134,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - default
 
 volumes:
   postgres_dev_data:

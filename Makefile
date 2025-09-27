@@ -1,4 +1,4 @@
-.PHONY: help dev build test clean docker-build docker-up docker-down
+.PHONY: help dev dev-up dev-down build test clean docker-build docker-up docker-down
 
 # Default target
 help:
@@ -18,8 +18,10 @@ help:
 	@echo "  test-e2e-debug - Run E2E tests in debug mode"
 
 # Development
-dev:
-	docker-compose -f docker-compose.dev.yml up -d
+dev: dev-up
+
+dev-up:
+	docker-compose -f docker-compose.dev.yml up -d --build
 	@echo "Development infrastructure started!"
 	@echo "PostgreSQL: localhost:5432"
 	@echo "Redis: localhost:6379"
@@ -28,6 +30,10 @@ dev:
 	@echo "  make run-auth &"
 	@echo "  make run-boards &"
 	@echo "  cd frontend && npm start"
+
+dev-down:
+	docker-compose -f docker-compose.dev.yml down
+
 
 # Build all services
 build:
