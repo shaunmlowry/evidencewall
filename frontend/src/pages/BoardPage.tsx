@@ -30,6 +30,7 @@ const BoardPage: React.FC = () => {
   const navigate = useNavigate();
   const { joinBoard, leaveBoard, isConnected, onBoardUpdate } = useWebSocket();
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [selectedConnections, setSelectedConnections] = useState<Set<string>>(new Set());
   const [isConnecting, setIsConnecting] = useState(false);
   const [items, setItems] = useState<Array<{
     id: string;
@@ -232,6 +233,12 @@ const BoardPage: React.FC = () => {
           case 'connection_deleted': {
             const delId = msg.data?.id;
             setConnections((prev) => prev.filter((c) => c.id !== delId));
+            // Remove from selection if it was selected
+            setSelectedConnections((prev) => {
+              const newSelection = new Set(prev);
+              newSelection.delete(delId);
+              return newSelection;
+            });
             break;
           }
         }
@@ -369,27 +376,40 @@ const BoardPage: React.FC = () => {
   const handleToggleConnect = () => {
     setIsConnecting(!isConnecting);
     setFirstConnectId(null);
+    // Clear selections when entering/exiting connection mode
+    setSelectedItems(new Set());
+    setSelectedConnections(new Set());
   };
 
   const handleDeleteSelected = useCallback(() => {
-    if (selectedItems.size === 0) return;
+    if (selectedItems.size === 0 && selectedConnections.size === 0) return;
     
     const itemsToDelete = Array.from(selectedItems);
+    const connectionsToDelete = Array.from(selectedConnections);
     
     // Remove items locally
-    setItems(prev => prev.filter(item => !selectedItems.has(item.id)));
+    if (itemsToDelete.length > 0) {
+      setItems(prev => prev.filter(item => !selectedItems.has(item.id)));
+      
+      // Remove connections involving deleted items
+      setConnections(prev => prev.filter(conn => 
+        !itemsToDelete.includes(conn.from_item_id) && 
+        !itemsToDelete.includes(conn.to_item_id)
+      ));
+    }
     
-    // Remove connections involving deleted items
-    setConnections(prev => prev.filter(conn => 
-      !itemsToDelete.includes(conn.from_item_id) && 
-      !itemsToDelete.includes(conn.to_item_id)
-    ));
+    // Remove selected connections locally
+    if (connectionsToDelete.length > 0) {
+      setConnections(prev => prev.filter(conn => !selectedConnections.has(conn.id)));
+    }
     
-    // Clear selection
+    // Clear selections
     setSelectedItems(new Set());
+    setSelectedConnections(new Set());
     
     // Delete from server (best effort)
     if (id) {
+      // Delete items from server
       itemsToDelete.forEach(itemId => {
         const item = items.find(it => it.id === itemId);
         if (item?.serverId) {
@@ -398,8 +418,18 @@ const BoardPage: React.FC = () => {
           });
         }
       });
+      
+      // Delete connections from server
+      connectionsToDelete.forEach(connectionId => {
+        const connection = connections.find(conn => conn.id === connectionId);
+        if (connection) {
+          boardsApi.deleteBoardConnection(id, connection.id).catch(() => {
+            // Ignore deletion errors for now
+          });
+        }
+      });
     }
-  }, [selectedItems, items, id]);
+  }, [selectedItems, selectedConnections, items, connections, id]);
 
   // Initialize local items/connections when board loads
   useEffect(() => {
@@ -553,6 +583,21 @@ const BoardPage: React.FC = () => {
     }
   }, [firstConnectId, isConnecting, items, id]);
 
+  const onConnectionClick = useCallback((e: React.MouseEvent, connectionId: string) => {
+    e.stopPropagation();
+    if (isConnecting) return; // Don't allow selection during connection mode
+    
+    setSelectedConnections(prev => {
+      const newSelection = new Set(prev);
+      if (newSelection.has(connectionId)) {
+        newSelection.delete(connectionId);
+      } else {
+        newSelection.add(connectionId);
+      }
+      return newSelection;
+    });
+  }, [isConnecting]);
+
   const handleUpdateContent = useCallback((itemId: string, newContent: string) => {
     setItems((prev) => prev.map((it) => it.id === itemId ? { ...it, content: newContent } : it));
     const item = items.find((it) => it.id === itemId);
@@ -572,8 +617,12 @@ const BoardPage: React.FC = () => {
         panX,
         panY
       });
+    } else if (e.button === 0 && !isConnecting) { // Left click and not in connection mode
+      // Clear selections when clicking on empty canvas
+      setSelectedItems(new Set());
+      setSelectedConnections(new Set());
     }
-  }, [panX, panY]);
+  }, [panX, panY, isConnecting]);
 
   const onCanvasWheel = useCallback((e: React.WheelEvent) => {
     // Zoom is now handled by the global wheel handler
@@ -777,16 +826,53 @@ const BoardPage: React.FC = () => {
               const midX = (x1 + x2) / 2;
               const midY = (y1 + y2) / 2 + sagAmount;
 
+              const isSelected = selectedConnections.has(connection.id);
+
               return (
-                <path
-                  key={connection.id}
-                  d={`M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`}
-                  stroke="#cc0000"
-                  strokeWidth="2"
-                  fill="none"
-                  style={{ filter: 'drop-shadow(1px 1px 2px rgba(0,0,0,0.3))' }}
-                  data-testid="board-connection"
-                />
+                <g key={connection.id}>
+                  {/* Invisible thick path for easier clicking */}
+                  <path
+                    d={`M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`}
+                    stroke="transparent"
+                    strokeWidth="12"
+                    fill="none"
+                    style={{ 
+                      pointerEvents: canEdit ? 'stroke' : 'none',
+                      cursor: canEdit ? 'pointer' : 'default'
+                    }}
+                    onClick={(e) => canEdit && onConnectionClick(e, connection.id)}
+                    data-testid="board-connection-clickable"
+                  />
+                  {/* Visible connection line */}
+                  <path
+                    d={`M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`}
+                    stroke={isSelected ? "#ff4444" : "#cc0000"}
+                    strokeWidth={isSelected ? "4" : "2"}
+                    fill="none"
+                    style={{ 
+                      filter: isSelected 
+                        ? 'drop-shadow(2px 2px 4px rgba(255,68,68,0.5))' 
+                        : 'drop-shadow(1px 1px 2px rgba(0,0,0,0.3))',
+                      pointerEvents: 'none'
+                    }}
+                    data-testid="board-connection"
+                  />
+                  {/* Selection indicator dot at midpoint */}
+                  {isSelected && (
+                    <circle
+                      cx={midX}
+                      cy={midY}
+                      r="6"
+                      fill="#ff4444"
+                      stroke="#ffffff"
+                      strokeWidth="2"
+                      style={{ 
+                        filter: 'drop-shadow(1px 1px 2px rgba(0,0,0,0.3))',
+                        pointerEvents: 'none'
+                      }}
+                    />
+                  )}
+                </g>
               );
             })}
           </svg>
@@ -865,15 +951,15 @@ const BoardPage: React.FC = () => {
           />
           <SpeedDialAction
             icon={<DeleteIcon />}
-            tooltipTitle={`Delete Selected (${selectedItems.size} items)`}
-            onClick={selectedItems.size > 0 ? handleDeleteSelected : undefined}
+            tooltipTitle={`Delete Selected (${selectedItems.size} items, ${selectedConnections.size} connections)`}
+            onClick={(selectedItems.size > 0 || selectedConnections.size > 0) ? handleDeleteSelected : undefined}
             sx={{ 
-              bgcolor: selectedItems.size > 0 ? 'error.main' : 'action.disabled',
+              bgcolor: (selectedItems.size > 0 || selectedConnections.size > 0) ? 'error.main' : 'action.disabled',
               '&:hover': {
-                bgcolor: selectedItems.size > 0 ? 'error.dark' : 'action.disabled'
+                bgcolor: (selectedItems.size > 0 || selectedConnections.size > 0) ? 'error.dark' : 'action.disabled'
               },
-              opacity: selectedItems.size > 0 ? 1 : 0.5,
-              pointerEvents: selectedItems.size > 0 ? 'auto' : 'none'
+              opacity: (selectedItems.size > 0 || selectedConnections.size > 0) ? 1 : 0.5,
+              pointerEvents: (selectedItems.size > 0 || selectedConnections.size > 0) ? 'auto' : 'none'
             }}
             data-testid="delete-selected-button"
           />
