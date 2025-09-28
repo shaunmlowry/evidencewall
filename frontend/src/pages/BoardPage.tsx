@@ -63,6 +63,35 @@ const BoardPage: React.FC = () => {
     offsetX: number;
     offsetY: number;
   }>({ itemId: null, offsetX: 0, offsetY: 0 });
+
+  // Track items being dragged to prevent processing WebSocket updates during drag
+  const isDraggingItem = useCallback((itemId: string) => {
+    if (!dragging.itemId) return false;
+    
+    // Check if the dragged item matches by frontend ID
+    if (dragging.itemId === itemId) {
+      console.log('isDraggingItem: Match by frontend ID', { dragging: dragging.itemId, itemId });
+      return true;
+    }
+    
+    // For freshly created items, also check if the WebSocket itemId matches the serverId
+    const draggedItem = items.find(item => item.id === dragging.itemId);
+    if (draggedItem && draggedItem.serverId === itemId) {
+      console.log('isDraggingItem: Match by serverId', { 
+        dragging: dragging.itemId, 
+        itemId, 
+        serverId: draggedItem.serverId 
+      });
+      return true;
+    }
+    
+    console.log('isDraggingItem: No match', { 
+      dragging: dragging.itemId, 
+      itemId, 
+      draggedItem: draggedItem ? { id: draggedItem.id, serverId: draggedItem.serverId } : null
+    });
+    return false;
+  }, [dragging.itemId, items]);
   const [firstConnectId, setFirstConnectId] = useState<string | null>(null);
 
   // Zoom and pan functions
@@ -122,8 +151,19 @@ const BoardPage: React.FC = () => {
         switch (msg.event) {
           case 'item_created': {
             const it = msg.data;
+            console.log('WebSocket item_created:', {
+              itemId: it.id,
+              position: { x: it.x, y: it.y },
+              existingItems: items.map(item => ({ id: item.id, serverId: item.serverId }))
+            });
+            
             setItems((prev) => {
-              if (prev.some((p) => p.id === it.id)) return prev;
+              // Check if item already exists by ID or serverId
+              if (prev.some((p) => p.id === it.id || p.serverId === it.id)) {
+                console.log('Skipping duplicate item_created for:', it.id);
+                return prev;
+              }
+              console.log('Adding new item from WebSocket:', it.id);
               return [
                 ...prev,
                 {
@@ -145,6 +185,20 @@ const BoardPage: React.FC = () => {
           }
           case 'item_updated': {
             const it = msg.data;
+            console.log('WebSocket item_updated:', {
+              itemId: it.id,
+              isDragging: isDraggingItem(it.id),
+              currentDragging: dragging.itemId,
+              position: { x: it.x, y: it.y }
+            });
+            
+            // Skip position updates for items currently being dragged to prevent visual artifacts
+            if (isDraggingItem(it.id)) {
+              console.log('Skipping WebSocket update for item being dragged:', it.id);
+              break;
+            }
+            
+            console.log('Applying WebSocket update for item:', it.id);
             setItems((prev) => prev.map((p) => (p.id === it.id ? {
               ...p,
               x: it.x ?? p.x,
@@ -185,7 +239,7 @@ const BoardPage: React.FC = () => {
     };
     
     onBoardUpdate(handler);
-  }, [id, onBoardUpdate]);
+  }, [id, onBoardUpdate, isDraggingItem]);
 
   // (removed debug global click listener)
 
@@ -440,6 +494,7 @@ const BoardPage: React.FC = () => {
     const moved = items.find((it) => it.id === dragging.itemId);
     setDragging({ itemId: null, offsetX: 0, offsetY: 0 });
     if (!moved || !moved.serverId || !id) return;
+    
     // Persist position best-effort
     boardsApi.updateBoardItem(id, moved.serverId, { x: moved.x, y: moved.y }).catch(() => {});
   }, [dragging.itemId, id, items, isPanning]);
@@ -502,6 +557,7 @@ const BoardPage: React.FC = () => {
     setItems((prev) => prev.map((it) => it.id === itemId ? { ...it, content: newContent } : it));
     const item = items.find((it) => it.id === itemId);
     if (!item || !item.serverId || !id) return;
+    
     boardsApi.updateBoardItem(id, item.serverId, { content: newContent }).catch(() => {});
   }, [id, items]);
 

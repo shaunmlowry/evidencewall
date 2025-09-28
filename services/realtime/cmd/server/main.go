@@ -94,6 +94,13 @@ func main() {
 		handleWebSocket(hub, jwtManager, w, r)
 	})
 
+	// Health check endpoint
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("healthy"))
+	})
+
 	log.Printf("WebSocket server listening on :8003")
 	if err := http.ListenAndServe(":8003", nil); err != nil {
 		log.Fatalf("server error: %v", err)
