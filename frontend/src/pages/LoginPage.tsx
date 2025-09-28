@@ -132,6 +132,7 @@ const LoginPage: React.FC = () => {
 
           <Divider sx={{ my: 2 }}>or</Divider>
 
+	  {/*
           <Button
             fullWidth
             variant="outlined"
@@ -141,6 +142,7 @@ const LoginPage: React.FC = () => {
           >
             Continue with Google
           </Button>
+	 */}
 
           <Box textAlign="center">
             <Typography variant="body2">
