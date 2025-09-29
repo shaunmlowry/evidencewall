@@ -110,12 +110,9 @@ services:
       args:
         VITE_API_BASE_URL: /api/auth
         VITE_BOARDS_API_URL: /api/boards
-        VITE_WEBSOCKET_URL: /api/realtime
+        VITE_WEBSOCKET_URL: ws://localhost/api/realtime
     ports:
       - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/ssl:/etc/nginx/ssl:ro
     networks:
       - app
     environment:

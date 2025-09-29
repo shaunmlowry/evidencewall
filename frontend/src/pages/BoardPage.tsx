@@ -64,6 +64,11 @@ const BoardPage: React.FC = () => {
     offsetX: number;
     offsetY: number;
   }>({ itemId: null, offsetX: 0, offsetY: 0 });
+  
+  // Track pending create operations to defer WebSocket processing
+  const pendingCreates = useRef<Set<string>>(new Set()); // temp IDs awaiting server IDs
+  const queuedMessages = useRef<any[]>([]);
+  const wsHandlerRef = useRef<((msg: any) => void) | null>(null);
 
   // Track items being dragged to prevent processing WebSocket updates during drag
   const isDraggingItem = useCallback((itemId: string) => {
@@ -94,6 +99,17 @@ const BoardPage: React.FC = () => {
     return false;
   }, [dragging.itemId, items]);
   const [firstConnectId, setFirstConnectId] = useState<string | null>(null);
+
+  // Process queued WebSocket messages after pending creates resolve
+  const processQueuedMessages = useCallback(() => {
+    if (!wsHandlerRef.current) return;
+    const messages = queuedMessages.current;
+    queuedMessages.current = [];
+    if (messages.length > 0) {
+      console.log(`Processing ${messages.length} queued WebSocket messages`);
+      messages.forEach(msg => wsHandlerRef.current!(msg));
+    }
+  }, []);
 
   // Zoom and pan functions
   const zoomIn = useCallback(() => {
@@ -149,6 +165,14 @@ const BoardPage: React.FC = () => {
       try {
         const msg = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (!msg || msg.board_id !== id) return;
+        
+        // If there are pending create operations, queue this message for later
+        if (pendingCreates.current.size > 0) {
+          console.log(`Queueing WebSocket message (${msg.event}) - ${pendingCreates.current.size} pending creates`);
+          queuedMessages.current.push(msg);
+          return;
+        }
+        
         switch (msg.event) {
           case 'item_created': {
             const it = msg.data;
@@ -164,6 +188,7 @@ const BoardPage: React.FC = () => {
                 console.log('Skipping duplicate item_created for:', it.id);
                 return prev;
               }
+              
               console.log('Adding new item from WebSocket:', it.id);
               return [
                 ...prev,
@@ -200,7 +225,8 @@ const BoardPage: React.FC = () => {
             }
             
             console.log('Applying WebSocket update for item:', it.id);
-            setItems((prev) => prev.map((p) => (p.id === it.id ? {
+            // Match by either frontend ID or serverId (for newly created items)
+            setItems((prev) => prev.map((p) => (p.id === it.id || p.serverId === it.id ? {
               ...p,
               x: it.x ?? p.x,
               y: it.y ?? p.y,
@@ -214,7 +240,8 @@ const BoardPage: React.FC = () => {
           }
           case 'item_deleted': {
             const delId = msg.data?.id;
-            setItems((prev) => prev.filter((p) => p.id !== delId));
+            // Match by either frontend ID or serverId (for newly created items)
+            setItems((prev) => prev.filter((p) => p.id !== delId && p.serverId !== delId));
             break;
           }
           case 'connection_created': {
@@ -245,8 +272,20 @@ const BoardPage: React.FC = () => {
       } catch {}
     };
     
+    // Store handler reference for processing queued messages
+    wsHandlerRef.current = handler;
+    
     onBoardUpdate(handler);
-  }, [id, onBoardUpdate, isDraggingItem]);
+    
+    return () => {
+      // Cleanup: process any remaining queued messages
+      if (queuedMessages.current.length > 0) {
+        console.log('Cleanup: processing remaining queued messages');
+        processQueuedMessages();
+      }
+      wsHandlerRef.current = null;
+    };
+  }, [id, onBoardUpdate, isDraggingItem, processQueuedMessages]);
 
   // (removed debug global click listener)
 
@@ -313,6 +352,10 @@ const BoardPage: React.FC = () => {
     };
     setItems((prev) => [...prev, newItem]);
 
+    // Track this pending create to defer WebSocket messages
+    pendingCreates.current.add(tempId);
+    console.log(`Added pending create: ${tempId}, total pending: ${pendingCreates.current.size}`);
+
     // Best-effort server create (backend expects type 'note')
     boardsApi
       .createBoardItem(id, {
@@ -326,10 +369,21 @@ const BoardPage: React.FC = () => {
         metadata: { variant: 'post-it' },
       })
       .then((created) => {
-        setItems((prev) => prev.map((it) => (it.id === tempId ? { ...it, serverId: created.id } : it)));
+        console.log('API createBoardItem resolved:', { tempId, serverId: created.id });
+        setItems((prev) => {
+          const updated = prev.map((it) => (it.id === tempId ? { ...it, serverId: created.id } : it));
+          console.log('Updated item with serverId:', updated.find(it => it.id === tempId));
+          return updated;
+        });
       })
       .catch(() => {
         // Keep local-only on failure
+      })
+      .finally(() => {
+        // Remove from pending and process queued messages
+        pendingCreates.current.delete(tempId);
+        console.log(`Removed pending create: ${tempId}, remaining: ${pendingCreates.current.size}`);
+        processQueuedMessages();
       });
   };
 
@@ -353,6 +407,10 @@ const BoardPage: React.FC = () => {
     };
     setItems((prev) => [...prev, newItem]);
 
+    // Track this pending create to defer WebSocket messages
+    pendingCreates.current.add(tempId);
+    console.log(`Added pending create: ${tempId}, total pending: ${pendingCreates.current.size}`);
+
     // Best-effort server create (store as note with metadata)
     boardsApi
       .createBoardItem(id, {
@@ -366,10 +424,21 @@ const BoardPage: React.FC = () => {
         metadata: { variant: 'suspect-card' },
       })
       .then((created) => {
-        setItems((prev) => prev.map((it) => (it.id === tempId ? { ...it, serverId: created.id } : it)));
+        console.log('API createBoardItem resolved:', { tempId, serverId: created.id });
+        setItems((prev) => {
+          const updated = prev.map((it) => (it.id === tempId ? { ...it, serverId: created.id } : it));
+          console.log('Updated item with serverId:', updated.find(it => it.id === tempId));
+          return updated;
+        });
       })
       .catch(() => {
         // Keep local-only on failure
+      })
+      .finally(() => {
+        // Remove from pending and process queued messages
+        pendingCreates.current.delete(tempId);
+        console.log(`Removed pending create: ${tempId}, remaining: ${pendingCreates.current.size}`);
+        processQueuedMessages();
       });
   };
 
