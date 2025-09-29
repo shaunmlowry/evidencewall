@@ -555,6 +555,7 @@ const BoardPage: React.FC = () => {
     if (isConnecting) {
       return;
     }
+    e.stopPropagation(); // Prevent canvas panning when clicking on items
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const item = items.find((it) => it.id === itemId);
@@ -677,8 +678,10 @@ const BoardPage: React.FC = () => {
 
   // Pan and zoom event handlers
   const onCanvasMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button === 1 || (e.button === 0 && e.ctrlKey)) { // Middle mouse or Ctrl+Left click for panning
-      e.preventDefault();
+    if (e.button === 1 || e.button === 0) { // Middle mouse or left mouse for panning
+      if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
+        e.preventDefault(); // Only prevent default for middle mouse and Ctrl+Left
+      }
       setIsPanning(true);
       setPanStart({
         x: e.clientX,
@@ -686,10 +689,11 @@ const BoardPage: React.FC = () => {
         panX,
         panY
       });
-    } else if (e.button === 0 && !isConnecting) { // Left click and not in connection mode
-      // Clear selections when clicking on empty canvas
-      setSelectedItems(new Set());
-      setSelectedConnections(new Set());
+      // Clear selections when clicking on empty canvas (left click only)
+      if (e.button === 0 && !isConnecting) {
+        setSelectedItems(new Set());
+        setSelectedConnections(new Set());
+      }
     }
   }, [panX, panY, isConnecting]);
 
@@ -812,7 +816,7 @@ const BoardPage: React.FC = () => {
         )}
       </Box>
 
-      {/* Board Canvas */}
+      {/* Board Canvas - Drag background to pan, Ctrl/Cmd+Wheel to zoom */}
       <Box
         ref={canvasRef}
         sx={{
