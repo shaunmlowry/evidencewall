@@ -15,6 +15,7 @@ type BoardRepositoryInterface interface {
 	ListPublic(offset, limit int) ([]models.Board, int64, error)
 	Update(board *models.Board) error
 	Delete(id uuid.UUID) error
+	GetUserIDByEmail(email string) (uuid.UUID, error)
 }
 
 // BoardUserRepositoryInterface defines the interface for board user repository operations

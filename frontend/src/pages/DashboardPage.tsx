@@ -4,6 +4,7 @@ import {
     MoreVert as MoreVertIcon,
     People as PeopleIcon,
     Public as PublicIcon,
+    Share as ShareIcon,
 } from '@mui/icons-material';
 import {
     Alert,
@@ -31,6 +32,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ShareBoardDialog from '../components/ShareBoardDialog';
 import { useAuth } from '../contexts/AuthContext';
 import { boardsApi } from '../services/api';
 import { Board, BoardVisibility, CreateBoardRequest } from '../types';
@@ -43,6 +45,7 @@ const DashboardPage: React.FC = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedBoard, setSelectedBoard] = useState<Board | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [newBoard, setNewBoard] = useState<CreateBoardRequest>({
     title: '',
     description: '',
@@ -128,6 +131,19 @@ const DashboardPage: React.FC = () => {
 
   const canDeleteBoard = (board: Board) => {
     return board.owner_id === user?.id || board.permission === 'admin';
+  };
+
+  const canShareBoard = (board: Board) => {
+    return board.owner_id === user?.id || board.permission === 'admin';
+  };
+
+  const handleShareBoard = () => {
+    setShareDialogOpen(true);
+    setAnchorEl(null);
+  };
+
+  const handleShareSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['boards'] });
   };
 
   if (isLoading) {
@@ -243,12 +259,26 @@ const DashboardPage: React.FC = () => {
         <MenuItem onClick={() => navigate(`/board/${selectedBoard?.id}`)}>
           Open
         </MenuItem>
+        {selectedBoard && canShareBoard(selectedBoard) && (
+          <MenuItem onClick={handleShareBoard}>
+            <ShareIcon fontSize="small" sx={{ mr: 1 }} />
+            Share
+          </MenuItem>
+        )}
         {selectedBoard && canDeleteBoard(selectedBoard) && (
           <MenuItem onClick={handleDeleteBoard} sx={{ color: 'error.main' }}>
             Delete
           </MenuItem>
         )}
       </Menu>
+
+      {/* Share board dialog */}
+      <ShareBoardDialog
+        open={shareDialogOpen}
+        board={selectedBoard}
+        onClose={() => setShareDialogOpen(false)}
+        onSuccess={handleShareSuccess}
+      />
 
       {/* Create board dialog */}
       <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="sm" fullWidth>

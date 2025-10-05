@@ -280,6 +280,47 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
+// GetUserByEmail godoc
+// @Summary Get user by email
+// @Description Get user information by email address (for sharing purposes)
+// @Tags users
+// @Produce json
+// @Security BearerAuth
+// @Param email query string true "User email address"
+// @Success 200 {object} models.UserResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /users/by-email [get]
+func (h *AuthHandler) GetUserByEmail(c *gin.Context) {
+	// Verify requesting user is authenticated
+	_, exists := middleware.GetUserID(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	email := c.Query("email")
+	if email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Email parameter is required"})
+		return
+	}
+
+	user, err := h.authService.GetUserByEmail(email)
+	if err != nil {
+		switch err {
+		case service.ErrUserNotFound:
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
+}
+
 // generateRandomState generates a random state string for OAuth
 func generateRandomState() string {
 	b := make([]byte, 32)

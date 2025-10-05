@@ -262,11 +262,11 @@ func (s *BoardService) DeleteBoard(boardID, userID uuid.UUID) error {
 
 // ShareBoardRequest represents a board sharing request
 type ShareBoardRequest struct {
-	UserID     uuid.UUID              `json:"user_id" binding:"required"`
+	UserEmail  string                 `json:"user_email" binding:"required,email"`
 	Permission models.PermissionLevel `json:"permission" binding:"required,oneof=read write admin"`
 }
 
-// ShareBoard shares a board with a user
+// ShareBoard shares a board with a user by email
 func (s *BoardService) ShareBoard(boardID, ownerID uuid.UUID, req ShareBoardRequest) error {
 	board, permission, err := s.boardRepo.GetByIDWithPermission(boardID, ownerID)
 	if err != nil {
@@ -279,8 +279,14 @@ func (s *BoardService) ShareBoard(boardID, ownerID uuid.UUID, req ShareBoardRequ
 		return ErrUnauthorized
 	}
 
+	// Look up user by email from auth service
+	userID, err := s.getUserIDByEmail(req.UserEmail)
+	if err != nil {
+		return fmt.Errorf("failed to lookup user: %w", err)
+	}
+
 	// Check if user already has access
-	existing, err := s.boardUserRepo.GetByBoardAndUser(boardID, req.UserID)
+	existing, err := s.boardUserRepo.GetByBoardAndUser(boardID, userID)
 	if err != nil {
 		return fmt.Errorf("failed to check existing access: %w", err)
 	}
@@ -294,11 +300,38 @@ func (s *BoardService) ShareBoard(boardID, ownerID uuid.UUID, req ShareBoardRequ
 	// Create new board user relationship
 	boardUser := &models.BoardUser{
 		BoardID:    boardID,
-		UserID:     req.UserID,
+		UserID:     userID,
 		Permission: req.Permission,
 	}
 
 	return s.boardUserRepo.Create(boardUser)
+}
+
+// getUserIDByEmail looks up a user ID by email using the repository method
+func (s *BoardService) getUserIDByEmail(email string) (uuid.UUID, error) {
+	ctx := context.Background()
+	cacheKey := "user:email:" + email
+
+	// Try cache first
+	cached, err := s.redis.Get(ctx, cacheKey).Result()
+	if err == nil {
+		userID, err := uuid.Parse(cached)
+		if err == nil {
+			return userID, nil
+		}
+	}
+
+	// Cache miss - query via repository method
+	// In a proper microservices setup, this would be an HTTP call to auth service
+	userID, err := s.boardRepo.GetUserIDByEmail(email)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("user not found with email: %s", email)
+	}
+
+	// Cache the result for 5 minutes
+	s.redis.Set(ctx, cacheKey, userID.String(), 5*60*1000000000) // 5 minutes
+
+	return userID, nil
 }
 
 // UnshareBoard removes a user's access to a board

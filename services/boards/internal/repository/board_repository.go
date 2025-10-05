@@ -137,6 +137,19 @@ func (r *BoardRepository) Delete(id uuid.UUID) error {
 	return r.db.Unscoped().Where("id = ?", id).Delete(&models.Board{}).Error
 }
 
+// GetUserIDByEmail retrieves a user ID by email (for sharing purposes)
+func (r *BoardRepository) GetUserIDByEmail(email string) (uuid.UUID, error) {
+	var user models.User
+	err := r.db.Where("email = ? AND active = ?", email, true).Select("id").First(&user).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return uuid.Nil, errors.New("user not found")
+		}
+		return uuid.Nil, err
+	}
+	return user.ID, nil
+}
+
 // BoardUserRepository handles board user relationships
 type BoardUserRepository struct {
 	db *gorm.DB
@@ -181,5 +194,3 @@ func (r *BoardUserRepository) ListByBoard(boardID uuid.UUID) ([]models.BoardUser
 	err := r.db.Preload("User").Where("board_id = ?", boardID).Find(&boardUsers).Error
 	return boardUsers, err
 }
-
-

@@ -14,7 +14,7 @@ export interface AuthResponse {
 }
 
 // Board types
-export type PermissionLevel = 'read' | 'read_write' | 'admin';
+export type PermissionLevel = 'read' | 'write' | 'admin';
 export type BoardVisibility = 'private' | 'shared' | 'public';
 
 export interface Board {

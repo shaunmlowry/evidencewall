@@ -35,4 +35,5 @@ type AuthServiceInterface interface {
 	UpdateProfile(userID uuid.UUID, req UpdateProfileRequest) (*models.UserResponse, error)
 	GetGoogleLoginURL(state string) (string, error)
 	GoogleCallback(code string) (*AuthResponse, error)
+	GetUserByEmail(email string) (*models.UserResponse, error)
 }

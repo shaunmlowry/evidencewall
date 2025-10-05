@@ -141,6 +141,9 @@ func main() {
 			protected.GET("/me", authHandler.GetProfile)
 			protected.PUT("/me", authHandler.UpdateProfile)
 			protected.POST("/logout", authHandler.Logout)
+
+			// User lookup endpoints
+			protected.GET("/users/by-email", authHandler.GetUserByEmail)
 		}
 	}
 

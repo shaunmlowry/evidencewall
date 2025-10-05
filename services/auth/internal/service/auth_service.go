@@ -184,6 +184,20 @@ func (s *AuthService) GetProfile(userID uuid.UUID) (*models.UserResponse, error)
 	return &response, nil
 }
 
+// GetUserByEmail retrieves a user by email
+func (s *AuthService) GetUserByEmail(email string) (*models.UserResponse, error) {
+	user, err := s.userRepo.GetByEmail(email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+	if user == nil {
+		return nil, ErrUserNotFound
+	}
+
+	response := user.ToResponse()
+	return &response, nil
+}
+
 // UpdateProfileRequest represents a profile update request
 type UpdateProfileRequest struct {
 	Name   string `json:"name" binding:"omitempty,min=2,max=100"`
