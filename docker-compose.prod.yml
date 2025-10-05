@@ -1,0 +1,116 @@
+networks:
+  # Simplified single network for all services
+  app:
+    driver: bridge
+
+services:
+  # Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: evidencewall
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: evidencewall
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evidencewall"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for caching and pub/sub
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Authentication Service
+  auth-service:
+    image: shaunmlowry/evidencewall-auth-service:1.0
+    networks:
+      - app
+    environment:
+      - DATABASE_URL=postgres://evidencewall:${POSTGRES_PASSWORD}@postgres:5432/evidencewall?sslmode=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRY=24h
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URL=http://localhost/api/auth/google/callback
+      - CORS_ORIGINS=http://localhost,https://localhost
+      - ENVIRONMENT=production
+      - LOG_LEVEL=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Boards Service
+  boards-service:
+    image: shaunmlowry/evidencewall-boards-service:1.0
+    networks:
+      - app
+    environment:
+      - DATABASE_URL=postgres://evidencewall:${POSTGRES_PASSWORD}@postgres:5432/evidencewall?sslmode=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET}
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - CORS_ORIGINS=http://localhost,https://localhost
+      - ENVIRONMENT=production
+      - LOG_LEVEL=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    restart: unless-stopped
+
+  # Real-time Service (TODO: Implement when needed)
+  realtime-service:
+    image: shaunmlowry/evidencewall-realtime-service:1.0
+    networks:
+      - app
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET}
+      - ENVIRONMENT=production
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Unified NGINX (serves frontend + reverse proxy)
+  nginx:
+    image: shaunmlowry/evidencewall-nginx:1.0
+    ports:
+      - "80:80"
+    networks:
+      - app
+    environment:
+      - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+    depends_on:
+      - auth-service
+      - boards-service
+      - realtime-service
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
