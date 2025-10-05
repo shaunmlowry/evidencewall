@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+docker compose build
+
+for i in $(docker image ls 'shaunmlowry/*' | awk '/shaunmlowry/ {print $1}' | sort -u)
+do
+	hubimg=$(echo $i | sed -e 's!shaunmlowry/\([^:]*\):.*!\1!')
+	img=$(echo $hubimg | sed -e 's!shaunmlowry/!!')
+	ver=$(docker image ls $hubimg  | awk '/shaunmlowry/ {print $1 ":" $2}' | sort -V | tail -1 | sed -e 's/.*://')
+	nextver=$(echo $ver | awk -F. '/[0-9]+\./{$NF++;print}' OFS=.)
+
+	docker tag ${img}:latest ${hubimg}:${nextver}
+	docker push ${hubimg}:${nextver}
+
+	sed -i -e "s%${hubimg}:.*%${hubimg}:${nextver}%" docker-compose.prod.yml
+done
