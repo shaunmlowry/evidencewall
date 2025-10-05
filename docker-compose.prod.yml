@@ -98,9 +98,12 @@ services:
 
   # Unified NGINX (serves frontend + reverse proxy)
   nginx:
-    image: shaunmlowry/evidencewall-nginx:1.0
+    image: shaunmlowry/evidencewall-nginx:1.2
     ports:
       - "80:80"
+    volumes:
+      - ./nginx/default.prod.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx/lets-encrypt:/letsenccrypt
     networks:
       - app
     environment:
