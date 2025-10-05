@@ -1,6 +1,5 @@
 # Build frontend first
 FROM node:18-alpine AS frontend-builder
-RUN apk add certbot certbot-nginx
 
 WORKDIR /app
 
@@ -26,12 +25,14 @@ RUN npm run build
 
 # Nginx stage with frontend files
 FROM nginx:alpine
+RUN apk add certbot certbot-nginx
 
 # Copy the built frontend files
 COPY --from=frontend-builder /app/dist /usr/share/nginx/html
 
 # Expose port
 EXPOSE 80
+EXPOSE 443
 
 # Start nginx
 CMD ["nginx", "-g", "daemon off;"]
