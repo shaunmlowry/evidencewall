@@ -788,7 +788,7 @@ const BoardPage: React.FC = () => {
     );
   }
 
-  const canEdit = board.permission === 'read_write' || board.permission === 'admin';
+  const canEdit = board.permission === 'write' || board.permission === 'admin';
 
   return (
     <Box sx={{ height: '100vh', overflow: 'hidden', position: 'relative' }}>
