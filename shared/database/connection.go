@@ -3,8 +3,10 @@ package database
 import (
 	"context"
 	"fmt"
+	"html"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"evidence-wall/shared/models"
@@ -103,6 +105,45 @@ func CreateIndexes(db *gorm.DB) error {
 	}
 
 	log.Println("Database indexes created successfully")
+	return nil
+}
+
+// FixHTMLEncodedContent fixes existing HTML-encoded content in board items
+func FixHTMLEncodedContent(db *gorm.DB) error {
+	log.Println("Fixing HTML-encoded content in board items...")
+
+	var items []models.BoardItem
+	if err := db.Find(&items).Error; err != nil {
+		return fmt.Errorf("failed to fetch board items: %w", err)
+	}
+
+	updatedCount := 0
+	for _, item := range items {
+		originalContent := item.Content
+
+		// Check if content contains HTML entities that need to be decoded
+		if strings.Contains(originalContent, "&quot;") ||
+			strings.Contains(originalContent, "&#39;") ||
+			strings.Contains(originalContent, "&amp;") ||
+			strings.Contains(originalContent, "&lt;") ||
+			strings.Contains(originalContent, "&gt;") {
+
+			// Decode HTML entities
+			decodedContent := html.UnescapeString(originalContent)
+
+			// Only update if content actually changed
+			if decodedContent != originalContent {
+				item.Content = decodedContent
+				if err := db.Save(&item).Error; err != nil {
+					log.Printf("Warning: Failed to update item %s: %v", item.ID, err)
+					continue
+				}
+				updatedCount++
+			}
+		}
+	}
+
+	log.Printf("Fixed HTML-encoded content in %d board items", updatedCount)
 	return nil
 }
 

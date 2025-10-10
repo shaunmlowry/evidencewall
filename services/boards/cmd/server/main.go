@@ -74,6 +74,11 @@ func main() {
 		log.Printf("Warning: Failed to create indexes: %v", err)
 	}
 
+	// Fix existing HTML-encoded content (one-time data migration)
+	if err := database.FixHTMLEncodedContent(db); err != nil {
+		log.Printf("Warning: Failed to fix HTML-encoded content: %v", err)
+	}
+
 	// Connect to Redis
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     cfg.RedisHost + ":" + cfg.RedisPort,

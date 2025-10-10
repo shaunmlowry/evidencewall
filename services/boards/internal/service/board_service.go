@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html"
 	"log"
 	"regexp"
 	"strings"
@@ -43,9 +42,8 @@ func validateAndSanitizeString(input string, maxLength int, fieldName string) (s
 		return "", fmt.Errorf("%s: %w (max %d characters)", fieldName, ErrInputTooLong, maxLength)
 	}
 
-	// Remove HTML tags and escape HTML entities
+	// Remove HTML tags but preserve Unicode characters
 	sanitized := htmlTagRegex.ReplaceAllString(input, "")
-	sanitized = html.EscapeString(sanitized)
 
 	// Trim whitespace
 	sanitized = strings.TrimSpace(sanitized)
