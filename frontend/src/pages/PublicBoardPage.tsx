@@ -11,6 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { boardsApi } from '../services/api';
+import { decodeHtmlEntities } from '../utils/htmlDecode';
 
 const PublicBoardPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -159,7 +160,7 @@ const PublicBoardPage: React.FC = () => {
                     overflow: 'hidden',
                   }}
                 >
-                  {item.content || 'Evidence notes...'}
+                  {decodeHtmlEntities(item.content || 'Evidence notes...')}
                 </Typography>
               ) : (
                 <Box>
@@ -186,7 +187,7 @@ const PublicBoardPage: React.FC = () => {
                     Suspect Name
                   </Typography>
                   <Typography variant="body2" color="textSecondary">
-                    {item.content || 'Age: Unknown\nLast seen:\nNotes:'}
+                    {decodeHtmlEntities(item.content || 'Age: Unknown\nLast seen:\nNotes:')}
                   </Typography>
                 </Box>
               )}

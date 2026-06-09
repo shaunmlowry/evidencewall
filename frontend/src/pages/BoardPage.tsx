@@ -24,6 +24,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { boardsApi } from '../services/api';
+import { decodeHtmlEntities } from '../utils/htmlDecode';
 
 const BoardPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -1201,7 +1202,7 @@ const BoardItemComponent: React.FC<BoardItemComponentProps> = ({
               overflow: 'hidden',
             }}
           >
-            {item.content || 'Evidence notes...'}
+            {decodeHtmlEntities(item.content || 'Evidence notes...')}
           </Typography>
         )
       ) : (
@@ -1337,13 +1338,13 @@ const SuspectCardContent: React.FC<SuspectCardContentProps> = ({
           {suspect.name || 'Suspect Name'}
         </Typography>
         <Typography variant="body2" color="textSecondary" sx={{ whiteSpace: 'pre-wrap' }}>
-          {`Age: ${suspect.age || 'Unknown'}\nLast seen: ${suspect.lastSeen || ''}\nNotes:`}
+          {`Age: ${decodeHtmlEntities(suspect.age || 'Unknown')}\nLast seen: ${decodeHtmlEntities(suspect.lastSeen || '')}\nNotes:`}
         </Typography>
         {suspect.notes && (
-          <Typography 
-            variant="body2" 
-            sx={{ 
-              whiteSpace: 'pre-wrap', 
+          <Typography
+            variant="body2"
+            sx={{
+              whiteSpace: 'pre-wrap',
               mt: 1,
               maxHeight: '120px',
               overflow: 'auto',
@@ -1353,7 +1354,7 @@ const SuspectCardContent: React.FC<SuspectCardContentProps> = ({
               backgroundColor: '#fafafa'
             }}
           >
-            {suspect.notes}
+            {decodeHtmlEntities(suspect.notes)}
           </Typography>
         )}
       </>
