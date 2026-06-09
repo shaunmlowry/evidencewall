@@ -1338,7 +1338,7 @@ const SuspectCardContent: React.FC<SuspectCardContentProps> = ({
           {suspect.name || 'Suspect Name'}
         </Typography>
         <Typography variant="body2" color="textSecondary" sx={{ whiteSpace: 'pre-wrap' }}>
-          {decodeHtmlEntities(`Age: ${suspect.age || 'Unknown'}\nLast seen: ${suspect.lastSeen || ''}\nNotes:`)}
+          {`Age: ${decodeHtmlEntities(suspect.age || 'Unknown')}\nLast seen: ${decodeHtmlEntities(suspect.lastSeen || '')}\nNotes:`}
         </Typography>
         {suspect.notes && (
           <Typography

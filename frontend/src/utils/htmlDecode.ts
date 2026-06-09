@@ -4,7 +4,7 @@
  * @returns The decoded text.
  */
 export function decodeHtmlEntities(text: string): string {
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = text;
-  return textarea.value;
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, 'text/html');
+  return doc.documentElement.textContent || '';
 }
